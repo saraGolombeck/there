@@ -1,12 +1,5 @@
 #!/bin/bash
 
-# Configuration
-DB_HOST="postgres-service"
-DB_USER="user"
-DB_PASSWORD="password"
-API_URL="http://backend-service/api/resource"
-FRONTEND_URL="http://frontend-service"
-
 # Test Results Storage
 RESULTS=()
 
