@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    triggers {
+        cron('H */2 * * *') // Run every 2 hours
+    }
+
     environment {
         KUBECONFIG_PATH = "${WORKSPACE}/kubeconfig"
         SECRET_YAML_PATH = "${WORKSPACE}/secret.yaml"
