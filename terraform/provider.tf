@@ -3,6 +3,7 @@ provider "aws" {
   shared_credentials_file = "~/.aws/credentials" # Path to AWS credentials file
 }
 
+
 terraform {
   backend "s3" {
     bucket         = "terraform-state-bucket" # S3 bucket name
