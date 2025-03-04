@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels:
+    app: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: my-cluster-m02 
+      containers:
+      - name: backend
+        image: ghcr.io/le7-devops/backend:latest  
+        ports:
+        - containerPort: 3010
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3010"
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: backend-config
+              key: DATABASE_URL
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: be
+spec:
+  selector:
+    app: backend
+  ports:
+  - port: 3010
+    targetPort: 3010
+  type: ClusterIP
