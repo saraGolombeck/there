@@ -18,8 +18,8 @@ spec:
         kubernetes.io/hostname: my-cluster-m02 
       containers:
       - name: frontend
-        image: 10.100.127.57/frontend1:latest
-
+        # image: 10.100.127.57/frontend1:latest
+        image: ghcr.io/le7-devops/frontend:latest
         ports:
         - containerPort: 80
         resources:
