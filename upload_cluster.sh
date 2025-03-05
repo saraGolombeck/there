@@ -30,15 +30,15 @@
 
 
 #!/bin/bash
-# סקריפט להקמת קלאסטר Kubernetes עם K3D
+# # סקריפט להקמת קלאסטר Kubernetes עם K3D
 
-# בדיקה אם kubectl מותקן, אם לא - התקנה
-if ! command -v kubectl &> /dev/null; then
-    echo "מתקין kubectl..."
-    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-    chmod +x kubectl
-    mv kubectl /usr/local/bin/
-fi
+# # בדיקה אם kubectl מותקן, אם לא - התקנה
+# if ! command -v kubectl &> /dev/null; then
+#     echo "מתקין kubectl..."
+#     curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+#     chmod +x kubectl
+#     mv kubectl /usr/local/bin/
+# fi
 
 # מחיקת קלאסטר קיים (אם יש)
 k3d cluster delete my-cluster 2>/dev/null
