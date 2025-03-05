@@ -118,8 +118,8 @@ pipeline {
                     // Run the existing setup-cluster.sh script
                     sh '''
                     cd gitops
-                    chmod +x k8s/setup-cluster.sh
-                    ./k8s/setup-cluster.sh
+                    chmod +x k8s/upload_cluster.sh
+                    ./k8s/upload_cluster.sh
                     
                     # Save kubeconfig for future stages
                     k3d kubeconfig get my-cluster > ${KUBECONFIG_PATH}
