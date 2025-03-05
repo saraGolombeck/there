@@ -16,7 +16,7 @@ pipeline {
                 script {
                     sh '''
                     echo "בדיקת חיבור ל-K3d..."
-                    ./uploud_cluster.sh
+                    ./upload_cluster.sh
                     # בדיקה שהקלאסטר קיים
                     if ! k3d cluster list | grep -q my-cluster; then
                         echo "הקלאסטר 'my-cluster' לא קיים ב-K3d"
