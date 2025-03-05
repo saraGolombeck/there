@@ -448,4 +448,3 @@ EOF
             echo 'Tests failed or pipeline encountered errors'
         }
     }
-}
