@@ -146,7 +146,7 @@ k3d cluster create my-cluster \
 
 # המתנה לאתחול הקלאסטר
 echo "ממתין 20 שניות לאתחול מלא של הקלאסטר..."
-sleep 20
+sleep 3
 
 # יצירת קובץ kubeconfig במיקום הנדרש
 mkdir -p ${WORKSPACE:-$(pwd)}
