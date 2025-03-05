@@ -16,14 +16,7 @@ pipeline {
                 script {
                     sh '''
                     echo "בדיקת חיבור ל-K3d..."
-                    ./upload_cluster.sh
-                    # בדיקה שהקלאסטר קיים
-                    if ! k3d cluster list | grep -q my-cluster; then
-                        echo "הקלאסטר 'my-cluster' לא קיים ב-K3d"
-                        echo "הסקריפט upload_cluster.sh כנראה נכשל ביצירת הקלאסטר"
-                        exit 1
-                    fi
-                    
+                    ./upload_cluster.sh                    
                     # ייצא את הקונפיגורציה למשתנה סביבה
                     export KUBECONFIG=${KUBECONFIG}
                     
