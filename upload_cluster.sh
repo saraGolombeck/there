@@ -132,41 +132,37 @@
 # echo "נוצר קובץ kubeconfig חדש ב: ${WORKSPACE:-$(pwd)}/kubeconfig"
 
 #!/bin/bash
-# סקריפט פשוט להקמת קלאסטר Kubernetes עם K3D - ללא כישלונות
+# סקריפט להקמת קלאסטר Kubernetes עם K3D
 
-echo "מתחיל הקמת קלאסטר K3d..."
-
-# מחיקת קלאסטר קודם אם קיים
-echo "בודק אם קלאסטר קיים..."
+# מחיקת קלאסטר קיים אם קיים
+echo "מחיקת קלאסטר קיים אם קיים..."
 k3d cluster delete my-cluster 2>/dev/null || true
 
 # יצירת קלאסטר חדש
 echo "יוצר קלאסטר חדש..."
-k3d cluster create my-cluster --agents 1 -p "9090:80@loadbalancer" --k3s-arg "--disable=traefik@server:0" || true
+k3d cluster create my-cluster --agents 1 -p "9090:80@loadbalancer" --k3s-arg "--disable=traefik@server:0"
 
-# המתנה
-echo "ממתין 20 שניות לאתחול..."
+# המתנה לאתחול הקלאסטר
+echo "ממתין 20 שניות לאתחול מלא של הקלאסטר..."
 sleep 20
 
-# יצירת kubeconfig
-echo "יוצר קובץ kubeconfig..."
-mkdir -p "${WORKSPACE:-$(pwd)}"
-k3d kubeconfig get my-cluster > "${WORKSPACE:-$(pwd)}/kubeconfig" 2>/dev/null || true
+# יצירת קובץ kubeconfig במיקום הנדרש
+mkdir -p ${WORKSPACE:-$(pwd)}
+k3d kubeconfig get my-cluster > ${WORKSPACE:-$(pwd)}/kubeconfig
 
-# שימוש ב-kubeconfig
-export KUBECONFIG="${WORKSPACE:-$(pwd)}/kubeconfig"
+# הגדרת KUBECONFIG לשימוש מיידי
+export KUBECONFIG=${WORKSPACE:-$(pwd)}/kubeconfig
 
-# עדכון כתובת השרת
-echo "מעדכן כתובת שרת..."
-SERVER_LINE=$(grep "server:" "${KUBECONFIG}" || echo "server: https://localhost:6443")
-if [ -n "$SERVER_LINE" ]; then
-    SERVER_URL=$(echo "$SERVER_LINE" | awk '{print $2}')
-    sed -i "s#${SERVER_URL}#https://127.0.0.1:$(echo ${SERVER_URL} | grep -o '[0-9]*' | tail -1)#g" "${KUBECONFIG}" 2>/dev/null || true
-fi
+# תיקון ה-KUBECONFIG - החלפת 0.0.0.0 בכתובת IP של 127.0.0.1
+SERVER_URL=$(grep "server:" ${KUBECONFIG} | awk '{print $2}')
+PORT=$(echo $SERVER_URL | grep -oP '(?<=:)[0-9]+(?=/)')
+NEW_SERVER_URL="https://127.0.0.1:$PORT"
 
-# בדיקת הקלאסטר
-echo "בודק חיבור לקלאסטר..."
-kubectl get nodes || true
+sed -i "s#${SERVER_URL}#${NEW_SERVER_URL}#g" ${KUBECONFIG}
+echo "עדכון כתובת השרת ב-kubeconfig: ${SERVER_URL} -> ${NEW_SERVER_URL}"
 
-echo "הקלאסטר הוקם!"
-exit 0  # תמיד יוצא בהצלחה
+# בדיקה של הקלאסטר
+echo "בדיקת חיבור לקלאסטר..."
+kubectl get nodes || echo "לא ניתן להתחבר לקלאסטר כרגע, אך הסקריפט ימשיך"
+
+echo "הקמת הקלאסטר הסתיימה!"
