@@ -109,7 +109,6 @@ pipeline {
                 script {
                     // Install K3d if not present
                     sh '''
-                    cd gitops
                     if ! command -v k3d &> /dev/null; then
                         wget -q -O - https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
                     fi
