@@ -289,35 +289,35 @@ pipeline {
     
     environment {
         // הנתיב לקובץ הקונפיגורציה של K3d
-        KUBECONFIG = "/var/jenkins_home/.k3d/kubeconfig-my-cluster.yaml"
+        KUBECONFIG = "${WORKSPACE}/kubeconfig-my-cluster.yaml"
+
     }
-    
-    stages {
-        stage('Verify K3d Connection') {
-            steps {
-                script {
-                    // וודא שיש חיבור ל-K3d
-                    sh '''
-                    echo "בדיקת חיבור ל-K3d..."
-                    chmod +x upload_cluster.sh
-                    ./upload_cluster.sh
-
-
-                    # בדיקה שהקלאסטר קיים
-                    k3d cluster list | grep my-cluster || {
-                        echo "הקלאסטר 'my-cluster' לא קיים ב-K3d"
-                        exit 1
-                    }
-                    
-                    # ייצא את הקונפיגורציה למשתנה סביבה
-                    export KUBECONFIG=$KUBECONFIG
-                    
-                    # בדיקת חיבור
-                    kubectl get nodes || exit 1
-                    '''
-                }
-            }
+stage('Verify K3d Connection') {
+    steps {
+        script {
+            sh '''
+            echo "בדיקת חיבור ל-K3d..."
+            
+            # בדיקה שהקלאסטר קיים
+            if ! k3d cluster list | grep -q my-cluster; then
+                echo "הקלאסטר 'my-cluster' לא קיים ב-K3d"
+                echo "הסקריפט upload_cluster.sh כנראה נכשל ביצירת הקלאסטר"
+                exit 1
+            fi
+            
+            # ייצא את הקונפיגורציה למשתנה סביבה
+            export KUBECONFIG=${KUBECONFIG}
+            
+            # בדיקת חיבור
+            if ! kubectl get nodes; then
+                echo "לא ניתן להתחבר לקלאסטר באמצעות kubectl"
+                echo "ייתכן שקובץ ה-KUBECONFIG אינו תקין או שהקלאסטר אינו פעיל"
+                exit 1
+            fi
+            '''
         }
+    }
+}
         
         stage('Deploy Application') {
             steps {
