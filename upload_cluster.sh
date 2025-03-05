@@ -137,8 +137,12 @@
 # מחיקת קלאסטר קיים (אם יש)
 k3d cluster delete my-cluster 2>/dev/null
 
-# יצירת קלאסטר חדש עם שני צמתים (1 שרת, 1 עובד) ושימוש בלוקל הוסט
-k3d cluster create my-cluster --agents 1 -p "9090:80@loadbalancer" --k3s-arg "--disable=traefik@server:0"
+# יצירת קלאסטר חדש עם שני צמתים (1 שרת, 1 עובד) עם הגדרות רשת מפורשות
+k3d cluster create my-cluster \
+  --agents 1 \
+  -p "9090:80@loadbalancer" \
+  --k3s-arg "--disable=traefik@server:0" \
+  --network=host
 
 # המתנה לאתחול הקלאסטר
 echo "ממתין 20 שניות לאתחול מלא של הקלאסטר..."
@@ -151,10 +155,19 @@ k3d kubeconfig get my-cluster > ${WORKSPACE:-$(pwd)}/kubeconfig
 # הגדרת KUBECONFIG לשימוש מיידי
 export KUBECONFIG=${WORKSPACE:-$(pwd)}/kubeconfig
 
-# תיקון ה-KUBECONFIG - החלפת 0.0.0.0 בכתובת מתאימה
-# בסביבת k3d בדרך כלל אפשר להשתמש ב-host.docker.internal
+# קבלת IP של הרשת הפנימית של דוקר
+DOCKER_IP=$(ip -4 addr show docker0 | grep -Po 'inet \K[\d.]+')
+if [ -z "$DOCKER_IP" ]; then
+    DOCKER_IP=$(ip route | awk '/default/ { print $3 }')
+fi
+
+echo "IP של רשת Docker שנמצא: $DOCKER_IP"
+
+# תיקון ה-KUBECONFIG - החלפת 0.0.0.0 בכתובת IP של דוקר
 SERVER_URL=$(grep "server:" ${KUBECONFIG} | awk '{print $2}')
-NEW_SERVER_URL=$(echo ${SERVER_URL} | sed 's/0.0.0.0/host.docker.internal/')
+PORT=$(echo $SERVER_URL | grep -oP '(?<=:)[0-9]+(?=/)')
+NEW_SERVER_URL="https://$DOCKER_IP:$PORT"
+
 sed -i "s#${SERVER_URL}#${NEW_SERVER_URL}#g" ${KUBECONFIG}
 echo "עדכון כתובת השרת ב-kubeconfig: ${SERVER_URL} -> ${NEW_SERVER_URL}"
 
@@ -164,17 +177,41 @@ if kubectl get nodes; then
     echo "הקלאסטר פועל ומקושר כהלכה עם התצורה החדשה!"
 else
     echo "עדיין יש בעיית התחברות. מנסה פתרון אחר..."
-    # במקרה שגם הפתרון הזה לא עוזר, אפשר לנסות לגשת דרך localhost
-    sed -i "s#${NEW_SERVER_URL}#https://localhost:$(echo ${SERVER_URL} | grep -o '[0-9]*$')#g" ${KUBECONFIG}
+    
+    # נסיון עם localhost
+    sed -i "s#${NEW_SERVER_URL}#https://localhost:$PORT#g" ${KUBECONFIG}
     
     if kubectl get nodes; then
         echo "הקלאסטר פועל עם הגדרת localhost!"
     else
-        echo "לא הצלחנו להתחבר לקלאסטר. בודק מידע נוסף..."
-        kubectl cluster-info dump | grep -i "server"
-        echo "מנסה להתחבר ישירות לשרת k3d..."
-        docker exec k3d-my-cluster-server-0 k3s kubectl get nodes
-        exit 1
+        echo "נסיון עם 127.0.0.1 במקום localhost..."
+        sed -i "s#https://localhost:$PORT#https://127.0.0.1:$PORT#g" ${KUBECONFIG}
+        
+        if kubectl get nodes; then
+            echo "הקלאסטר פועל עם הגדרת 127.0.0.1!"
+        else
+            echo "לא הצלחנו להתחבר לקלאסטר. הדפסת פרטי תצורה:"
+            cat ${KUBECONFIG}
+            
+            echo "בדיקת קישוריות ל- $PORT:"
+            nc -zv localhost $PORT || echo "לא ניתן להתחבר ל- localhost:$PORT"
+            
+            echo "מנסה להתחבר ישירות לשרת k3d..."
+            docker exec k3d-my-cluster-server-0 k3s kubectl get nodes || true
+            
+            # הדפסת IP של מכולות k3d
+            echo "IP של מכולות k3d:"
+            docker inspect k3d-my-cluster-server-0 -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'
+            
+            K3D_SERVER_IP=$(docker inspect k3d-my-cluster-server-0 -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
+            if [ -n "$K3D_SERVER_IP" ]; then
+                echo "נסיון עם IP פנימי של שרת k3d: $K3D_SERVER_IP"
+                sed -i "s#https://127.0.0.1:$PORT#https://$K3D_SERVER_IP:6443#g" ${KUBECONFIG}
+                kubectl get nodes || echo "גם זה לא עבד"
+            fi
+            
+            exit 1
+        fi
     fi
 fi
 
