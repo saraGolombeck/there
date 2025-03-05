@@ -131,38 +131,38 @@
 # k3d kubeconfig get my-cluster > ${WORKSPACE:-$(pwd)}/kubeconfig
 # echo "נוצר קובץ kubeconfig חדש ב: ${WORKSPACE:-$(pwd)}/kubeconfig"
 
-#!/bin/bash
-# סקריפט להקמת קלאסטר Kubernetes עם K3D
+stage('Setup K3d Environment') {
+    steps {
+        script {
+            // התקנת k3d אם לא קיים
+            sh '''
+            if ! command -v k3d &> /dev/null; then
+                wget -q -O - https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
+            fi
+            '''
 
-# מחיקת קלאסטר קיים אם קיים
-echo "מחיקת קלאסטר קיים אם קיים..."
-k3d cluster delete my-cluster 2>/dev/null || true
-
-# יצירת קלאסטר חדש
-echo "יוצר קלאסטר חדש..."
-k3d cluster create my-cluster --agents 1 -p "9090:80@loadbalancer" --k3s-arg "--disable=traefik@server:0"
-
-# המתנה לאתחול הקלאסטר
-echo "ממתין 20 שניות לאתחול מלא של הקלאסטר..."
-sleep 20
-
-# יצירת קובץ kubeconfig במיקום הנדרש
-mkdir -p ${WORKSPACE:-$(pwd)}
-k3d kubeconfig get my-cluster > ${WORKSPACE:-$(pwd)}/kubeconfig
-
-# הגדרת KUBECONFIG לשימוש מיידי
-export KUBECONFIG=${WORKSPACE:-$(pwd)}/kubeconfig
-
-# תיקון ה-KUBECONFIG - החלפת 0.0.0.0 בכתובת IP של 127.0.0.1
-SERVER_URL=$(grep "server:" ${KUBECONFIG} | awk '{print $2}')
-PORT=$(echo $SERVER_URL | grep -oP '(?<=:)[0-9]+(?=/)')
-NEW_SERVER_URL="https://127.0.0.1:$PORT"
-
-sed -i "s#${SERVER_URL}#${NEW_SERVER_URL}#g" ${KUBECONFIG}
-echo "עדכון כתובת השרת ב-kubeconfig: ${SERVER_URL} -> ${NEW_SERVER_URL}"
-
-# בדיקה של הקלאסטר
-echo "בדיקת חיבור לקלאסטר..."
-kubectl get nodes || echo "לא ניתן להתחבר לקלאסטר כרגע, אך הסקריפט ימשיך"
-
-echo "הקמת הקלאסטר הסתיימה!"
+            // הרצת הסקריפט המעודכן
+            sh '''
+            chmod +x upload_cluster.sh
+            ./upload_cluster.sh
+            '''
+            
+            // בדיקת חיבור לקלאסטר באמצעות הקובץ שנוצר
+            sh '''
+            export KUBECONFIG=${WORKSPACE}/kubeconfig
+            kubectl get nodes || {
+                echo "===== מידע אבחוני ====="
+                echo "תוכן קובץ ה-kubeconfig:"
+                cat ${KUBECONFIG}
+                echo "\nמכולות k3d:"
+                docker ps | grep k3d
+                echo "\nIP של מכולות k3d:"
+                docker inspect k3d-my-cluster-server-0 -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'
+                echo "\nניסיון חיבור ישירות ממכולת השרת:"
+                docker exec k3d-my-cluster-server-0 kubectl get nodes
+                exit 1
+            }
+            '''
+        }
+    }
+}
