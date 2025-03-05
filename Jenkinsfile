@@ -104,6 +104,28 @@ pipeline {
             }
         }
         
+        // stage('Setup K3d Environment') {
+        //     steps {
+        //         script {
+        //             // Install K3d if not present
+        //             sh '''
+        //             if ! command -v k3d &> /dev/null; then
+        //                 wget -q -O - https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
+        //             fi
+        //             '''
+                    
+        //             // Run the existing setup-cluster.sh script
+        //             sh '''
+        //             chmod +x upload_cluster.sh
+        //             ./upload_cluster.sh
+                    
+        //             # Save kubeconfig for future stages
+        //             k3d kubeconfig get my-cluster > ${KUBECONFIG_PATH}
+        //             export KUBECONFIG=${KUBECONFIG_PATH}
+        //             '''
+        //         }
+        //     }
+        // }
         stage('Setup K3d Environment') {
             steps {
                 script {
@@ -113,20 +135,27 @@ pipeline {
                         wget -q -O - https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
                     fi
                     '''
-                    
+
                     // Run the existing setup-cluster.sh script
                     sh '''
                     chmod +x upload_cluster.sh
                     ./upload_cluster.sh
-                    
-                    # Save kubeconfig for future stages
-                    k3d kubeconfig get my-cluster > ${KUBECONFIG_PATH}
+
+                    # וודא שקובץ kubeconfig נוצר
+                    if [ ! -f ${KUBECONFIG_PATH} ]; then
+                        echo "קובץ KUBECONFIG לא נוצר! יוצר אותו שוב..."
+                        k3d kubeconfig get my-cluster > ${KUBECONFIG_PATH}
+                    fi
+
+                    # שים את ה-KUBECONFIG כמשתנה סביבה באופן מפורש
                     export KUBECONFIG=${KUBECONFIG_PATH}
+
+                    # בדיקה שאפשר להגיע לקלאסטר
+                    kubectl get nodes
                     '''
                 }
             }
         }
-        
         stage('Deploy Application') {
             steps {
                 script {
