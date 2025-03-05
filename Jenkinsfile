@@ -217,13 +217,21 @@ pipeline {
                             -p "8080:80@loadbalancer" \
                             --kubeconfig-update-default=false \
                             --kubeconfig-switch-context=false \
-                            --k3s-arg "--docker" \
-                            --kubeconfig ${KUBECONFIG}
+                            --k3s-arg "--docker"
+                        
+                        # ייצוא הקונפיגורציה בנפרד
+                        k3d kubeconfig get ${K3D_CLUSTER_NAME} > ${KUBECONFIG}
                         
                         # וידוא שקובץ הקונפיגורציה נוצר
                         if [ ! -f "${KUBECONFIG}" ]; then
-                            echo "שגיאה: קובץ ה-KUBECONFIG לא נוצר"
-                            exit 1
+                            echo "נסיון נוסף לייצוא הקונפיגורציה..."
+                            mkdir -p $(dirname ${KUBECONFIG})
+                            k3d kubeconfig get ${K3D_CLUSTER_NAME} > ${KUBECONFIG}
+                            
+                            if [ ! -f "${KUBECONFIG}" ]; then
+                                echo "שגיאה: קובץ ה-KUBECONFIG לא נוצר"
+                                exit 1
+                            fi
                         fi
                         
                         # הגדרת הרשאות לקובץ
