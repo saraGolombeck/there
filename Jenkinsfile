@@ -118,7 +118,7 @@ pipeline {
                     // Run the existing setup-cluster.sh script
                     sh '''
                     cd gitops
-                    chmod +x k8s/upload_cluster.sh
+                    chmod +x upload_cluster.sh
                     ./upload_cluster.sh
                     
                     # Save kubeconfig for future stages
