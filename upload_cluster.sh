@@ -44,7 +44,7 @@ fi
 k3d cluster delete my-cluster 2>/dev/null
 
 # יצירת קלאסטר חדש עם שני צמתים (1 שרת, 1 עובד) - ללא רישום חיצוני
-k3d cluster create my-cluster --agents 1 -p "8080:80@loadbalancer"
+k3d cluster create my-cluster --agents 1 -p "9090:80@loadbalancer"
 
 # המתנה קצרה לאתחול הקלאסטר
 sleep 10
