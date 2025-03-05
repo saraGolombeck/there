@@ -168,49 +168,152 @@
 //         }
 //     }
 // }
+
+
+
 pipeline {
     agent any
     
     triggers {
-        cron('H */2 * * *') // Run every 2 hours
+        cron('H */2 * * *') // הרצה כל שעתיים
     }
     
     environment {
-        // הנתיב לקובץ הקונפיגורציה של K3d
-        KUBECONFIG = "${WORKSPACE}/kubeconfig-my-cluster.yaml"
+        // הגדרת משתני סביבה גלובליים
+        K3D_CLUSTER_NAME = "my-cluster"
+        KUBECONFIG = "${WORKSPACE}/kubeconfig-${K3D_CLUSTER_NAME}.yaml"
     }
     
     stages {
-        stage('Verify K3d Connection') {
+        stage('Setup K3d') {
             steps {
                 script {
+                    // וידוא שהכלים הנדרשים מותקנים
                     sh '''
-                    echo "בדיקת חיבור ל-K3d..."
-                    
-                    # הרצת הסקריפט המעודכן
-                    chmod +x upload_cluster.sh
-                    ./upload_cluster.sh
-
-                    # בדיקה שהקלאסטר קיים
-                    k3d cluster list | grep my-cluster || {
-                        echo "הקלאסטר 'my-cluster' לא קיים ב-K3d"
-                        exit 1
-                    }
-                    
-                    # ייצא את הקונפיגורציה למשתנה סביבה
-                    export KUBECONFIG=${KUBECONFIG}
-                    
-                    # בדיקת חיבור
-                    kubectl get nodes || {
-                        echo "לא ניתן להתחבר לקלאסטר באמצעות kubectl"
-                        echo "ייתכן שקובץ ה-KUBECONFIG אינו תקין או שהקלאסטר אינו פעיל"
-                        exit 1
-                    }
+                        echo "בדיקת התקנת כלים..."
+                        which k3d || { echo "k3d אינו מותקן"; exit 1; }
+                        which kubectl || { echo "kubectl אינו מותקן"; exit 1; }
                     '''
                 }
             }
         }
         
-        // המשך השלבים שלך...
+        stage('Create K3d Cluster') {
+            steps {
+                script {
+                    sh '''
+                        # מחיקת קלאסטר קיים (אם יש)
+                        echo "מוחק קלאסטר קיים אם קיים..."
+                        k3d cluster delete ${K3D_CLUSTER_NAME} 2>/dev/null || true
+                        
+                        # ניקוי קובץ KUBECONFIG הישן אם קיים
+                        rm -f ${KUBECONFIG}
+                        
+                        # יצירת קלאסטר חדש עם הגדרות מתאימות לג׳נקינס
+                        echo "יוצר קלאסטר K3d חדש..."
+                        k3d cluster create ${K3D_CLUSTER_NAME} \
+                            --agents 1 \
+                            --registry-use registry.k3d:5000 \
+                            -p "8080:80@loadbalancer" \
+                            --kubeconfig-update-default=false \
+                            --kubeconfig-switch-context=false \
+                            --k3s-arg "--docker" \
+                            --kubeconfig ${KUBECONFIG}
+                        
+                        # וידוא שקובץ הקונפיגורציה נוצר
+                        if [ ! -f "${KUBECONFIG}" ]; then
+                            echo "שגיאה: קובץ ה-KUBECONFIG לא נוצר"
+                            exit 1
+                        fi
+                        
+                        # הגדרת הרשאות לקובץ
+                        chmod 644 ${KUBECONFIG}
+                        
+                        # הגדרת KUBECONFIG לשימוש בהמשך הסקריפט
+                        export KUBECONFIG=${KUBECONFIG}
+                        
+                        # בדיקה שהקלאסטר עלה בהצלחה
+                        echo "בודק שהקלאסטר פעיל..."
+                        kubectl --kubeconfig=${KUBECONFIG} get nodes
+                        if [ $? -ne 0 ]; then
+                            echo "שגיאה בהתחברות לקלאסטר"
+                            exit 1
+                        fi
+                    '''
+                }
+            }
+        }
+        
+        stage('Configure Nodes') {
+            steps {
+                script {
+                    sh '''
+                        # הגדרת KUBECONFIG
+                        export KUBECONFIG=${KUBECONFIG}
+                        
+                        # המתנה קצרה להתייצבות הקלאסטר
+                        sleep 10
+                        
+                        # קבלת שמות הצמתים
+                        NODES=($(kubectl --kubeconfig=${KUBECONFIG} get nodes -o jsonpath='{.items[*].metadata.name}'))
+                        
+                        if [ ${#NODES[@]} -lt 2 ]; then
+                            echo "שגיאה: לא זוהו מספיק צמתים בקלאסטר"
+                            kubectl --kubeconfig=${KUBECONFIG} get nodes
+                            exit 1
+                        fi
+                        
+                        MASTER_NODE=${NODES[0]}
+                        WORKER_NODE=${NODES[1]}
+                        
+                        # הצבת תגיות על הצמתים
+                        echo "הגדרת שם לשרת הראשון: my-cluster..."
+                        kubectl --kubeconfig=${KUBECONFIG} label nodes $MASTER_NODE kubernetes.io/hostname=my-cluster --overwrite
+                        
+                        echo "הגדרת שם לשרת השני: my-cluster-m02..."
+                        kubectl --kubeconfig=${KUBECONFIG} label nodes $WORKER_NODE kubernetes.io/hostname=my-cluster-m02 --overwrite
+                        
+                        # הצגת הצמתים ותגיותיהם
+                        echo "מציג צמתים ותגיות:"
+                        kubectl --kubeconfig=${KUBECONFIG} get nodes --show-labels
+                    '''
+                }
+            }
+        }
+        
+        stage('Verify Cluster') {
+            steps {
+                script {
+                    sh '''
+                        # הגדרת KUBECONFIG
+                        export KUBECONFIG=${KUBECONFIG}
+                        
+                        echo "הקלאסטר מוכן עם שני שרתים:"
+                        echo "1. my-cluster - עבור מסד הנתונים"
+                        echo "2. my-cluster-m02 - עבור הבקאנד והפרונטאנד"
+                        
+                        # בדיקה שהקלאסטר פעיל ומגיב
+                        kubectl --kubeconfig=${KUBECONFIG} get nodes
+                        kubectl --kubeconfig=${KUBECONFIG} get pods -A
+                        
+                        # שמירת הקונפיגורציה להמשך שימוש
+                        cp ${KUBECONFIG} ${WORKSPACE}/k3d-config-backup.yaml
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo "הקלאסטר הוקם בהצלחה!"
+        }
+        failure {
+            echo "נכשל בהקמת הקלאסטר"
+        }
+        always {
+            // שמירת קובץ הקונפיגורציה כארטיפקט
+            archiveArtifacts artifacts: "kubeconfig-${K3D_CLUSTER_NAME}.yaml", allowEmptyArchive: true
+        }
     }
 }
