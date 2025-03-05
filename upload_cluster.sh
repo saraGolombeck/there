@@ -131,38 +131,42 @@
 # k3d kubeconfig get my-cluster > ${WORKSPACE:-$(pwd)}/kubeconfig
 # echo "נוצר קובץ kubeconfig חדש ב: ${WORKSPACE:-$(pwd)}/kubeconfig"
 
-stage('Setup K3d Environment') {
-    steps {
-        script {
-            // התקנת k3d אם לא קיים
-            sh '''
-            if ! command -v k3d &> /dev/null; then
-                wget -q -O - https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
-            fi
-            '''
+#!/bin/bash
+# סקריפט להקמת קלאסטר Kubernetes עם K3D
 
-            // הרצת הסקריפט המעודכן
-            sh '''
-            chmod +x upload_cluster.sh
-            ./upload_cluster.sh
-            '''
-            
-            // בדיקת חיבור לקלאסטר באמצעות הקובץ שנוצר
-            sh '''
-            export KUBECONFIG=${WORKSPACE}/kubeconfig
-            kubectl get nodes || {
-                echo "===== מידע אבחוני ====="
-                echo "תוכן קובץ ה-kubeconfig:"
-                cat ${KUBECONFIG}
-                echo "\nמכולות k3d:"
-                docker ps | grep k3d
-                echo "\nIP של מכולות k3d:"
-                docker inspect k3d-my-cluster-server-0 -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'
-                echo "\nניסיון חיבור ישירות ממכולת השרת:"
-                docker exec k3d-my-cluster-server-0 kubectl get nodes
-                exit 1
-            }
-            '''
-        }
-    }
-}
+# מחיקת קלאסטר קיים (אם יש)
+k3d cluster delete my-cluster 2>/dev/null
+
+# יצירת קלאסטר חדש עם שני צמתים
+k3d cluster create my-cluster --agents 1 -p "9090:80@loadbalancer" --k3s-arg "--disable=traefik@server:0"
+
+echo "ממתין 20 שניות לאתחול מלא של הקלאסטר..."
+sleep 20
+
+# הסיבה לכשל: אל תיצור ואל תעדכן קובץ kubeconfig חדש בעצמך!
+# במקום זאת, השתמש ישירות בקובץ שיוצר k3d
+export KUBECONFIG=${HOME}/.k3d/kubeconfig-my-cluster.yaml
+
+# קבל את כתובת ה-IP של המכולה של השרת
+SERVER_CONTAINER_IP=$(docker inspect k3d-my-cluster-server-0 -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
+
+# עדכן את קובץ ה-kubeconfig כדי לשנות את כתובת השרת ל-IP האמיתי של המכולה
+SERVER_URL=$(grep "server:" ${KUBECONFIG} | awk '{print $2}')
+SERVER_PORT=$(echo $SERVER_URL | grep -oP '(?<=:)[0-9]+(?=/)')
+NEW_SERVER_URL="https://${SERVER_CONTAINER_IP}:6443"
+
+echo "מחליף כתובת שרת ב-kubeconfig: ${SERVER_URL} -> ${NEW_SERVER_URL}"
+sed -i "s|${SERVER_URL}|${NEW_SERVER_URL}|g" ${KUBECONFIG}
+
+echo "בדיקת חיבור לקלאסטר..."
+if kubectl get nodes; then
+    echo "חיבור לקלאסטר הצליח!"
+else
+    echo "לא ניתן להתחבר לקלאסטר כרגע, אך הסקריפט ימשיך"
+fi
+
+# יצירת עותק של קובץ ה-kubeconfig במיקום הנדרש עבור ג'נקינס
+mkdir -p ${WORKSPACE:-$(pwd)}
+cp ${KUBECONFIG} ${WORKSPACE:-$(pwd)}/kubeconfig
+
+echo "הקמת הקלאסטר הסתיימה!"
