@@ -299,7 +299,10 @@ pipeline {
                     // וודא שיש חיבור ל-K3d
                     sh '''
                     echo "בדיקת חיבור ל-K3d..."
-                    
+                    chmod +x upload_cluster.sh
+                    ./upload_cluster.sh
+
+
                     # בדיקה שהקלאסטר קיים
                     k3d cluster list | grep my-cluster || {
                         echo "הקלאסטר 'my-cluster' לא קיים ב-K3d"
