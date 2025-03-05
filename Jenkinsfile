@@ -116,7 +116,6 @@ pipeline {
                     
                     // Run the existing setup-cluster.sh script
                     sh '''
-                    cd gitops
                     chmod +x upload_cluster.sh
                     ./upload_cluster.sh
                     
