@@ -119,7 +119,7 @@ pipeline {
                     sh '''
                     cd gitops
                     chmod +x k8s/upload_cluster.sh
-                    ./k8s/upload_cluster.sh
+                    ./upload_cluster.sh
                     
                     # Save kubeconfig for future stages
                     k3d kubeconfig get my-cluster > ${KUBECONFIG_PATH}
