@@ -99,7 +99,7 @@ pipeline {
                 sshagent(['github']) {
                     sh 'rm -rf gitops'
                     sh 'git clone git@github.com:le7-devops/gitops.git'
-                    sh 'cd gitops'
+                    sh 'cd gitops && ls -la'  // הוספת פקודה להצגת התוכן
                 }
             }
         }
