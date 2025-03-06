@@ -76,42 +76,7 @@ pipeline {
             }
         }
         
-        // stage('הגדרת תגיות לצמתים') {
-        //     steps {
-        //         script {
-        //             sh """
-        //                 export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
-        //                 kubectl config use-context k3d-${params.CLUSTER_NAME}
-        //             """
-                    
-        //             sh """
-        //                 # קבלת כל הצמתים
-        //                 ALL_NODES=\$(kubectl get nodes --no-headers | awk '{print \$1}')
-                        
-        //                 # הגדרת התגית לצומת הראשי (שעליו ירוץ הפוסטגרס)
-        //                 MASTER_NODE=\$(echo "\$ALL_NODES" | head -1)
-        //                 echo "צומת ראשי: \$MASTER_NODE"
-        //                 kubectl label nodes \$MASTER_NODE kubernetes.io/hostname=${params.CLUSTER_NAME} --overwrite
-                        
-        //                 # טיפול בצמתי עבודה (שעליהם ירוצו הבקאנד והפרונטאנד)
-        //                 WORKER_NODES=\$(echo "\$ALL_NODES" | tail -n +2)
-        //                 if [ ! -z "\$WORKER_NODES" ]; then
-        //                     for NODE in \$WORKER_NODES; do
-        //                         echo "צומת עבודה: \$NODE"
-        //                         kubectl label nodes \$NODE kubernetes.io/hostname=${params.CLUSTER_NAME}-m02 --overwrite
-        //                         break  # מספיק צומת עבודה אחד
-        //                     done
-        //                 else
-        //                     echo "אזהרה: אין צמתי עבודה. הבקאנד והפרונטאנד לא יוכלו לרוץ עם ה-nodeSelector הנוכחי."
-        //                 fi
-                        
-        //                 # הצגת התגיות
-        //                 echo "תגיות הצמתים:"
-        //                 kubectl get nodes --show-labels
-        //             """
-        //         }
-        //     }
-        // }
+
 
 stage('הגדרת תגיות לצמתים') {
     steps {
@@ -156,69 +121,44 @@ stage('הגדרת תגיות לצמתים') {
             }
         }
         
-        stage('יצירת פוד בדיקות') {
-            steps {
-                script {
-                    // יצירת פוד הבדיקות עם הסביבה המתאימה
-                    sh """
-                        cat <<EOF > ${WORKSPACE}/e2e-test-pod.yaml
-                        apiVersion: v1
-                        kind: Pod
-                        metadata:
-                          name: e2e-tests
-                        spec:
-                          containers:
-                          - name: e2e-tests
-                            image: alpine:latest
-                            command: [ "sh", "-c", "apk add --no-cache curl postgresql-client && sleep 3600" ]
-                            env:
-                            - name: DB_HOST
-                              value: "db"
-                            - name: DB_USER
-                              valueFrom:
-                                secretKeyRef:
-                                  name: db-secret
-                                  key: POSTGRES_USER
-                            - name: DB_PASSWORD
-                              valueFrom:
-                                secretKeyRef:
-                                  name: db-secret
-                                  key: POSTGRES_PASSWORD
-                            - name: API_URL
-                              value: "http://be:3010/api/health"
-                            - name: FRONTEND_URL
-                              value: "http://fe"
-                        EOF
-                        
-                        kubectl apply -f ${WORKSPACE}/e2e-test-pod.yaml
-                        
-                        echo "המתנה לעליית פוד הבדיקות..."
-                        sleep 20
-                        kubectl get pod e2e-tests
-                    """
-                }
-            }
+stage('יצירת פוד בדיקות') {
+    steps {
+        script {
+            // בדיקה שקובץ pod.yaml קיים
+            sh "ls -la ${WORKSPACE}/E2E_test/pod.yaml"
+            
+            // יישום הפוד ישירות מהקובץ הקיים
+            sh "kubectl apply -f ${WORKSPACE}/E2E_test/pod.yaml"
+            
+            // המתנה שהפוד יהיה מוכן
+            sh """
+                echo "ממתין שפוד הבדיקות יהיה מוכן..."
+                sleep 10
+                kubectl wait --for=condition=ready pod/e2e-tests --timeout=60s || true
+                kubectl get pods
+            """
         }
-        
-        stage('הרצת בדיקות E2E') {
-            steps {
-                script {
-                    // העתקת סקריפט הבדיקות לפוד
-                    sh """
-                        # העתקת סקריפט הבדיקות לפוד
-                        kubectl cp ${TEST_SCRIPT_PATH} e2e-tests:/test.sh
-                        
-                        # הענקת הרשאות הרצה
-                        kubectl exec e2e-tests -- chmod +x /test.sh
-                        
-                        # הרצת הבדיקות
-                        echo "מריץ בדיקות..."
-                        kubectl exec e2e-tests -- sh -c '/test.sh'
-                    """
-                }
-            }
+    }
+}
+
+stage('הרצת בדיקות E2E') {
+    steps {
+        script {
+            // העתקת סקריפט הבדיקות והרצתו
+            sh """
+                # העתקת סקריפט הבדיקות לפוד
+                kubectl cp ${WORKSPACE}/E2E_test/test.sh e2e-tests:/test.sh
+                
+                # הענקת הרשאות הרצה
+                kubectl exec e2e-tests -- chmod +x /test.sh
+                
+                # הרצת הבדיקות
+                echo "מריץ בדיקות..."
+                kubectl exec e2e-tests -- sh -c '/test.sh'
+            """
         }
-        
+    }
+}        
         stage('אימות הקלאסטר') {
             steps {
                 script {
