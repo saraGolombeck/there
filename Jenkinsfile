@@ -354,14 +354,13 @@ pipeline {
                     // וידוא שתיקיית .kube קיימת
                     sh "mkdir -p \${HOME}/.kube"
                     
-                    // יצירת הקלאסטר עם הפקודה המלאה והגדרות נוספות לשיפור התקשורת
+                    // יצירת הקלאסטר עם הפקודה המלאה והגדרות תואמות
                     sh """
                         k3d cluster create ${params.CLUSTER_NAME} \\
                         --agents ${params.NUM_AGENTS} \\
                         --registry-use registry.k3d:5000 \\
                         -p \"${params.PORT_MAPPING}\" \\
                         --k3s-arg \"--no-deploy=traefik@server:*\" \\
-                        --no-lb \\
                         --api-port 6443
                     """
                     echo 'קלאסטר חדש נוצר בהצלחה.'
