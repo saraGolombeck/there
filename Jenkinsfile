@@ -292,36 +292,36 @@ pipeline {
             }
         }
         
-        stage('הכנת משאבי קוברנטיס') {
-            steps {
-                script {
-                    sh """
-                        export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+        // stage('הכנת משאבי קוברנטיס') {
+        //     steps {
+        //         script {
+        //             sh """
+        //                 export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
                         
-                        # יצירת ה-PersistentVolume עבור הפוסטגרס
-                        cat <<EOF | kubectl apply -f -
-                        apiVersion: v1
-                        kind: PersistentVolume
-                        metadata:
-                          name: postgres-pv
-                          labels:
-                            type: local
-                        spec:
-                          storageClassName: manual
-                          capacity:
-                            storage: 2Gi
-                          accessModes:
-                            - ReadWriteOnce
-                          hostPath:
-                            path: "/mnt/data"
-                        EOF
+        //                 # יצירת ה-PersistentVolume עבור הפוסטגרס
+        //                 cat <<EOF | kubectl apply -f -
+        //                 apiVersion: v1
+        //                 kind: PersistentVolume
+        //                 metadata:
+        //                   name: postgres-pv
+        //                   labels:
+        //                     type: local
+        //                 spec:
+        //                   storageClassName: manual
+        //                   capacity:
+        //                     storage: 2Gi
+        //                   accessModes:
+        //                     - ReadWriteOnce
+        //                   hostPath:
+        //                     path: "/mnt/data"
+        //                 EOF
                         
-                        # המתנה קצרה לוודא שה-PV נוצר
-                        sleep 5
-                    """
-                }
-            }
-        }
+        //                 # המתנה קצרה לוודא שה-PV נוצר
+        //                 sleep 5
+        //             """
+        //         }
+        //     }
+        // }
         
         stage('הפעלת האפליקציה') {
             steps {
