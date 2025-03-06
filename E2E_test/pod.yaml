@@ -1,3 +1,15 @@
+# # apiVersion: v1
+# # kind: Pod
+# # metadata:
+# #   name: e2e-tests
+# # spec:
+# #   containers:
+# #   - name: e2e-tests
+# #     image: bitnami/postgresql-client:latest
+# #     command: [ "sh", "-c", "sleep 3600" ] # Keeps the pod running
+# #     envFrom:
+# #     - secretRef:
+# #         name: e2e-env-secret
 # apiVersion: v1
 # kind: Pod
 # metadata:
@@ -5,11 +17,12 @@
 # spec:
 #   containers:
 #   - name: e2e-tests
-#     image: bitnami/postgresql-client:latest
-#     command: [ "sh", "-c", "sleep 3600" ] # Keeps the pod running
+#     image: alpine:latest
+#     command: [ "sh", "-c", "apk add --no-cache curl postgresql-client bash && sleep 3600" ]
 #     envFrom:
 #     - secretRef:
 #         name: e2e-env-secret
+
 apiVersion: v1
 kind: Pod
 metadata:
@@ -18,7 +31,10 @@ spec:
   containers:
   - name: e2e-tests
     image: alpine:latest
-    command: [ "sh", "-c", "apk add --no-cache curl postgresql-client bash && sleep 3600" ]
+    command: 
+      - "sh"
+      - "-c"
+      - "apk add --no-cache curl postgresql-client bash netcat-openbsd iputils && sleep 3600"
     envFrom:
     - secretRef:
         name: e2e-env-secret
