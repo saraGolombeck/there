@@ -126,7 +126,7 @@ stage('י 2 צירת פוד בדיקות') {
         script {
             // בדיקה שקובץ pod.yaml קיים
             sh "ls -la ${WORKSPACE}/E2E_test/pod.yaml"
-            
+            kubectl apply -f E2E_test/secret.yaml
             // יישום הפוד ישירות מהקובץ הקיים
             sh "kubectl apply -f ${WORKSPACE}/E2E_test/pod.yaml"
             
