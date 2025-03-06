@@ -219,7 +219,7 @@ pipeline {
                         k3d cluster create ${params.CLUSTER_NAME} \\
                         --agents ${params.NUM_AGENTS} \\
                         --timeout 5m \\
-                        --api-port 6443 \\
+                        --api-port 6444 \\
                         -p "${params.PORT_MAPPING}"
                     """
                     
