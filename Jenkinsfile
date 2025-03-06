@@ -335,43 +335,76 @@ pipeline {
             }
         }
         
-        stage('הגדרת תגיות לצמתים') {
-            steps {
-                script {
-                    sh """
-                        export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
-                        kubectl config use-context k3d-${params.CLUSTER_NAME}
-                    """
+        // stage('הגדרת תגיות לצמתים') {
+        //     steps {
+        //         script {
+        //             sh """
+        //                 export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+        //                 kubectl config use-context k3d-${params.CLUSTER_NAME}
+        //             """
                     
-                    sh """
-                        # קבלת כל הצמתים
-                        ALL_NODES=\$(kubectl get nodes --no-headers | awk '{print \$1}')
+        //             sh """
+        //                 # קבלת כל הצמתים
+        //                 ALL_NODES=\$(kubectl get nodes --no-headers | awk '{print \$1}')
                         
-                        # הגדרת התגית לצומת הראשי (שעליו ירוץ הפוסטגרס)
-                        MASTER_NODE=\$(echo "\$ALL_NODES" | head -1)
-                        echo "צומת ראשי: \$MASTER_NODE"
-                        kubectl label nodes \$MASTER_NODE kubernetes.io/hostname=${params.CLUSTER_NAME} --overwrite
+        //                 # הגדרת התגית לצומת הראשי (שעליו ירוץ הפוסטגרס)
+        //                 MASTER_NODE=\$(echo "\$ALL_NODES" | head -1)
+        //                 echo "צומת ראשי: \$MASTER_NODE"
+        //                 kubectl label nodes \$MASTER_NODE kubernetes.io/hostname=${params.CLUSTER_NAME} --overwrite
                         
-                        # טיפול בצמתי עבודה (שעליהם ירוצו הבקאנד והפרונטאנד)
-                        WORKER_NODES=\$(echo "\$ALL_NODES" | tail -n +2)
-                        if [ ! -z "\$WORKER_NODES" ]; then
-                            for NODE in \$WORKER_NODES; do
-                                echo "צומת עבודה: \$NODE"
-                                kubectl label nodes \$NODE kubernetes.io/hostname=${params.CLUSTER_NAME}-m02 --overwrite
-                                break  # מספיק צומת עבודה אחד
-                            done
-                        else
-                            echo "אזהרה: אין צמתי עבודה. הבקאנד והפרונטאנד לא יוכלו לרוץ עם ה-nodeSelector הנוכחי."
-                        fi
+        //                 # טיפול בצמתי עבודה (שעליהם ירוצו הבקאנד והפרונטאנד)
+        //                 WORKER_NODES=\$(echo "\$ALL_NODES" | tail -n +2)
+        //                 if [ ! -z "\$WORKER_NODES" ]; then
+        //                     for NODE in \$WORKER_NODES; do
+        //                         echo "צומת עבודה: \$NODE"
+        //                         kubectl label nodes \$NODE kubernetes.io/hostname=${params.CLUSTER_NAME}-m02 --overwrite
+        //                         break  # מספיק צומת עבודה אחד
+        //                     done
+        //                 else
+        //                     echo "אזהרה: אין צמתי עבודה. הבקאנד והפרונטאנד לא יוכלו לרוץ עם ה-nodeSelector הנוכחי."
+        //                 fi
                         
-                        # הצגת התגיות
-                        echo "תגיות הצמתים:"
-                        kubectl get nodes --show-labels
-                    """
-                }
-            }
+        //                 # הצגת התגיות
+        //                 echo "תגיות הצמתים:"
+        //                 kubectl get nodes --show-labels
+        //             """
+        //         }
+        //     }
+        // }
+
+stage('הגדרת תגיות לצמתים') {
+    steps {
+        script {
+            sh """
+                export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+                kubectl config use-context k3d-${params.CLUSTER_NAME}
+            """
+            
+            sh """
+                # קבלת כל הצמתים
+                ALL_NODES=\$(kubectl get nodes --no-headers | awk '{print \$1}')
+                
+                # זיהוי צומת מאסטר (server) וצומת עבודה (agent)
+                for NODE in \$ALL_NODES; do
+                    if [[ "\$NODE" == *"server"* ]]; then
+                        echo "צומת מאסטר (שרת): \$NODE"
+                        # לצומת המאסטר - תווית שתשמש את הפוסטגרס
+                        kubectl label nodes \$NODE kubernetes.io/hostname=${params.CLUSTER_NAME} --overwrite
+                    elif [[ "\$NODE" == *"agent"* ]]; then
+                        echo "צומת עבודה (סוכן): \$NODE"
+                        # לצומת העבודה - תווית שתשמש את הבקאנד והפרונטאנד
+                        kubectl label nodes \$NODE kubernetes.io/hostname=${params.CLUSTER_NAME}-m02 --overwrite
+                    fi
+                done
+                
+                # הצגת התגיות לאימות
+                echo "תגיות הצמתים:"
+                kubectl get nodes --show-labels
+            """
         }
-        
+    }
+}
+
         stage('הפעלת האפליקציה') {
             steps {
                 script {
