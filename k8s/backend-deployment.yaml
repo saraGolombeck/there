@@ -15,7 +15,7 @@ spec:
         app: backend
     spec:
       nodeSelector:
-        kubernetes.io/hostname: cluster-m02
+        kubernetes.io/hostname: my-cluster-m02
       containers:
       - name: backend
         image: ghcr.io/le7-devops/backend:latest  
