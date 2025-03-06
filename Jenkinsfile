@@ -159,7 +159,7 @@ stage('הרצת בדיקות E2E') {
                 
                 # הרצת הבדיקות עם sh מפורש
                 echo "מריץ בדיקות..."
-                kubectl exec e2e-tests -- /bin/sh /test.sh
+                kubectl exec e2e-tests -- bash /test.sh
             """
         }
     }
