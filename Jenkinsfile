@@ -169,7 +169,7 @@ pipeline {
     parameters {
         string(name: 'CLUSTER_NAME', defaultValue: 'my-cluster', description: 'שם הקלאסטר')
         string(name: 'NUM_AGENTS', defaultValue: '1', description: 'מספר צמתי העבודה')
-        string(name: 'PORT_MAPPING', defaultValue: '8080:80@loadbalancer', description: 'מיפוי פורטים')
+        string(name: 'PORT_MAPPING', defaultValue: '9999:80@loadbalancer', description: 'מיפוי פורטים')
     }
     
     options {
