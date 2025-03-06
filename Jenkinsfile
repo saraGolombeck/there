@@ -54,7 +54,6 @@ pipeline {
                     // תיקון קובץ kubeconfig - החלפת הכתובת לשם הדומיין הפנימי של serverlb
                     sh """
                         # החלפת 0.0.0.0 בשם הדומיין הפנימי של serverlb
-                        // sed -i 's|server: https://0.0.0.0:6443|server: https://k3d-${params.CLUSTER_NAME}-serverlb:6443|g' \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
                         
                         # בדיקת התיקון
                         grep "server:" \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
@@ -131,127 +130,127 @@ pipeline {
                     """
                 }
             }
-         }
+        }
         
-//         stage('יצירת פוד בדיקות') {
-//             steps {
-//                 script {
-//                     // יצירת פוד הבדיקות עם הסביבה המתאימה
-//                     sh """
-//                         export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+    //     stage('יצירת פוד בדיקות') {
+    //         steps {
+    //             script {
+    //                 // יצירת פוד הבדיקות עם הסביבה המתאימה
+    //                 sh """
+    //                     export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
                         
-//                         cat <<EOF > ${WORKSPACE}/e2e-test-pod.yaml
-//                         apiVersion: v1
-//                         kind: Pod
-//                         metadata:
-//                           name: e2e-tests
-//                         spec:
-//                           containers:
-//                           - name: e2e-tests
-//                             image: alpine:latest
-//                             command: [ "sh", "-c", "apk add --no-cache curl postgresql-client && sleep 3600" ]
-//                             env:
-//                             - name: DB_HOST
-//                               value: "db"
-//                             - name: DB_USER
-//                               valueFrom:
-//                                 secretKeyRef:
-//                                   name: db-secret
-//                                   key: POSTGRES_USER
-//                             - name: DB_PASSWORD
-//                               valueFrom:
-//                                 secretKeyRef:
-//                                   name: db-secret
-//                                   key: POSTGRES_PASSWORD
-//                             - name: API_URL
-//                               value: "http://be:3010/api/health"
-//                             - name: FRONTEND_URL
-//                               value: "http://fe"
-//                         EOF
+    //                     cat <<EOF > ${WORKSPACE}/e2e-test-pod.yaml
+    //                     apiVersion: v1
+    //                     kind: Pod
+    //                     metadata:
+    //                       name: e2e-tests
+    //                     spec:
+    //                       containers:
+    //                       - name: e2e-tests
+    //                         image: alpine:latest
+    //                         command: [ "sh", "-c", "apk add --no-cache curl postgresql-client && sleep 3600" ]
+    //                         env:
+    //                         - name: DB_HOST
+    //                           value: "db"
+    //                         - name: DB_USER
+    //                           valueFrom:
+    //                             secretKeyRef:
+    //                               name: db-secret
+    //                               key: POSTGRES_USER
+    //                         - name: DB_PASSWORD
+    //                           valueFrom:
+    //                             secretKeyRef:
+    //                               name: db-secret
+    //                               key: POSTGRES_PASSWORD
+    //                         - name: API_URL
+    //                           value: "http://be:3010/api/health"
+    //                         - name: FRONTEND_URL
+    //                           value: "http://fe"
+    //                     EOF
                         
-//                         kubectl apply -f ${WORKSPACE}/e2e-test-pod.yaml
+    //                     kubectl apply -f ${WORKSPACE}/e2e-test-pod.yaml
                         
-//                         echo "המתנה לעליית פוד הבדיקות..."
-//                         sleep 20
-//                         kubectl get pod e2e-tests
-//                     """
-//                 }
-//             }
-//         }
+    //                     echo "המתנה לעליית פוד הבדיקות..."
+    //                     sleep 20
+    //                     kubectl get pod e2e-tests
+    //                 """
+    //             }
+    //         }
+    //     }
         
-//         stage('הרצת בדיקות E2E') {
-//             steps {
-//                 script {
-//                     // העתקת סקריפט הבדיקות לפוד
-//                     sh """
-//                         export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+    //     stage('הרצת בדיקות E2E') {
+    //         steps {
+    //             script {
+    //                 // העתקת סקריפט הבדיקות לפוד
+    //                 sh """
+    //                     export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
                         
-//                         # העתקת סקריפט הבדיקות לפוד
-//                         kubectl cp ${TEST_SCRIPT_PATH} e2e-tests:/test.sh
+    //                     # העתקת סקריפט הבדיקות לפוד
+    //                     kubectl cp ${TEST_SCRIPT_PATH} e2e-tests:/test.sh
                         
-//                         # הענקת הרשאות הרצה
-//                         kubectl exec e2e-tests -- chmod +x /test.sh
+    //                     # הענקת הרשאות הרצה
+    //                     kubectl exec e2e-tests -- chmod +x /test.sh
                         
-//                         # הרצת הבדיקות
-//                         echo "מריץ בדיקות..."
-//                         kubectl exec e2e-tests -- sh -c '/test.sh'
-//                     """
-//                 }
-//             }
-//         }
+    //                     # הרצת הבדיקות
+    //                     echo "מריץ בדיקות..."
+    //                     kubectl exec e2e-tests -- sh -c '/test.sh'
+    //                 """
+    //             }
+    //         }
+    //     }
         
-//         stage('אימות הקלאסטר') {
-//             steps {
-//                 script {
-//                     sh """
-//                         export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+    //     stage('אימות הקלאסטר') {
+    //         steps {
+    //             script {
+    //                 sh """
+    //                     export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
                         
-//                         echo "בדיקת הקלאסטר הסופית:"
-//                         kubectl cluster-info
+    //                     echo "בדיקת הקלאסטר הסופית:"
+    //                     kubectl cluster-info
                         
-//                         echo "רשימת צמתים:"
-//                         kubectl get nodes
+    //                     echo "רשימת צמתים:"
+    //                     kubectl get nodes
                         
-//                         echo "רשימת פודים:"
-//                         kubectl get pods --all-namespaces
+    //                     echo "רשימת פודים:"
+    //                     kubectl get pods --all-namespaces
                         
-//                         echo "רשימת שירותים:"
-//                         kubectl get services
-//                     """
-//                 }
-//             }
-//         }
+    //                     echo "רשימת שירותים:"
+    //                     kubectl get services
+    //                 """
+    //             }
+    //         }
+    //     }
         
-//         stage('ניקוי') {
-//             steps {
-//                 script {
-//                     sh """
-//                         export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+    //     stage('ניקוי') {
+    //         steps {
+    //             script {
+    //                 sh """
+    //                     export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
                         
-//                         # מחיקת פוד הבדיקות
-//                         kubectl delete pod e2e-tests --ignore-not-found
-//                     """
-//                 }
-//             }
-//         }
-//     }
+    //                     # מחיקת פוד הבדיקות
+    //                     kubectl delete pod e2e-tests --ignore-not-found
+    //                 """
+    //             }
+    //         }
+    //     }
+    // }
     
-//     post {
-//         success {
-//             echo """
-//             הקמת קלאסטר K3D Kubernetes והרצת בדיקות הושלמו בהצלחה!
+    // post {
+    //     success {
+    //         echo """
+    //         הקמת קלאסטר K3D Kubernetes והרצת בדיקות הושלמו בהצלחה!
             
-//             להתחברות לקלאסטר, השתמש בפקודה:
-//             export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
-//             kubectl get pods
-//             """
-//         }
-//         failure {
-//             echo 'הקמת קלאסטר K3D Kubernetes או הרצת הבדיקות נכשלו.'
-//         }
-//         always {
-//             echo 'הסרת קבצים זמניים...'
-//             sh "rm -f ${WORKSPACE}/e2e-test-pod.yaml"
-//         }
-//     }
- }
+    //         להתחברות לקלאסטר, השתמש בפקודה:
+    //         export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+    //         kubectl get pods
+    //         """
+    //     }
+    //     failure {
+    //         echo 'הקמת קלאסטר K3D Kubernetes או הרצת הבדיקות נכשלו.'
+    //     }
+    //     always {
+    //         echo 'הסרת קבצים זמניים...'
+    //         sh "rm -f ${WORKSPACE}/e2e-test-pod.yaml"
+    //     }
+    // }
+}
