@@ -169,7 +169,7 @@ pipeline {
     parameters {
         string(name: 'CLUSTER_NAME', defaultValue: 'my-cluster', description: 'שם הקלאסטר')
         string(name: 'NUM_AGENTS', defaultValue: '1', description: 'מספר צמתי העבודה')
-        string(name: 'PORT_MAPPING', defaultValue: '9999:80@loadbalancer', description: 'מיפוי פורטים')
+        string(name: 'PORT_MAPPING', defaultValue: '8080:80@loadbalancer', description: 'מיפוי פורטים')
     }
     
     options {
@@ -210,12 +210,50 @@ pipeline {
         stage('יצירת קלאסטר חדש') {
             steps {
                 script {
-                    // יצירת רג'יסטרי חדש במקום להשתמש בקיים
-                    sh "k3d cluster create ${params.CLUSTER_NAME} --agents ${params.NUM_AGENTS} --registry-create registry.k3d:5000 -p \"${params.PORT_MAPPING}\""
-                    echo 'קלאסטר חדש נוצר בהצלחה עם רג׳יסטרי מובנה.'
+                    // יצירת הקלאסטר עם הפקודה המלאה
+                    sh "k3d cluster create ${params.CLUSTER_NAME} --agents ${params.NUM_AGENTS} --registry-use registry.k3d:5000 -p \"${params.PORT_MAPPING}\""
+                    echo 'קלאסטר חדש נוצר בהצלחה.'
                     
-                    // המתנה לצמתים להיות מוכנים
-                    sh 'kubectl wait --for=condition=ready node --all --timeout=300s'
+                    // עדכון קובץ ה-kubeconfig באופן מפורש
+                    sh "k3d kubeconfig get ${params.CLUSTER_NAME} > \${HOME}/.kube/config"
+                    sh "chmod 600 \${HOME}/.kube/config"
+                    
+                    // המתנה קצרה לאתחול המערכת
+                    sh "sleep 30"
+                    
+                    // בדיקת מצב הקלאסטר ונסיונות חוזרים
+                    def maxRetries = 5
+                    def retryCount = 0
+                    def clusterReady = false
+                    
+                    while (!clusterReady && retryCount < maxRetries) {
+                        try {
+                            // בדיקה אם אפשר להגיע ל-API
+                            def apiStatus = sh(script: 'kubectl cluster-info', returnStatus: true)
+                            
+                            if (apiStatus == 0) {
+                                echo "הקלאסטר מוכן והגישה ל-API עובדת."
+                                clusterReady = true
+                            } else {
+                                retryCount++
+                                echo "נסיון ${retryCount}/${maxRetries}: לא ניתן להגיע ל-API. ממתין 10 שניות..."
+                                sh "sleep 10"
+                            }
+                        } catch (Exception e) {
+                            retryCount++
+                            echo "נסיון ${retryCount}/${maxRetries}: שגיאה: ${e.message}. ממתין 10 שניות..."
+                            sh "sleep 10"
+                        }
+                    }
+                    
+                    if (!clusterReady) {
+                        error "לא ניתן להתחבר ל-Kubernetes API לאחר ${maxRetries} נסיונות. בדוק את הגדרות הקלאסטר."
+                    }
+                    
+                    // המתנה שהצמתים יהיו מוכנים, רק לאחר שה-API זמין
+                    sh 'kubectl get nodes'
+                    echo "ממתין שהצמתים יהיו מוכנים..."
+                    sh 'kubectl wait --for=condition=ready node --all --timeout=300s || true'
                 }
             }
         }
