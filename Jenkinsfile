@@ -243,7 +243,7 @@ pipeline {
                     """
                     
                     // המתנה להתייצבות הקלאסטר
-                    sh "sleep 30"
+                    sh "sleep 5"
                     
                     // הגדרת משתנה סביבה KUBECONFIG לשימוש בשלבים הבאים
                     env.KUBECONFIG = "\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config"
@@ -329,7 +329,6 @@ pipeline {
                     sh """
                         export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
                         
-                        echo "הפעלת מסד הנתונים..."
                         kubectl apply -k k8s/
                         
 

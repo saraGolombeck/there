@@ -16,6 +16,7 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/hostname: k3d-my-cluster-server-0
+      containers:
       - name: postgres
         image: postgres:12
         ports:
