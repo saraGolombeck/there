@@ -330,26 +330,9 @@ pipeline {
                         export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
                         
                         echo "הפעלת מסד הנתונים..."
-                        kubectl apply -f k8s/postgres-deployment.yaml
+                        kubectl apply -k k8s/
                         
-                        echo "המתנה להתייצבות הפוסטגרס..."
-                        sleep 20
-                        kubectl get pods -l app=postgres
-                        
-                        echo "הפעלת הבקאנד..."
-                        kubectl apply -f k8s/backend-deployment.yaml
-                        
-                        echo "הפעלת הפרונטאנד..."
-                        kubectl apply -f k8s/frontend-deployment.yaml
-                        
-                        echo "המתנה להתייצבות כל הרכיבים..."
-                        sleep 30
-                        
-                        echo "רשימת כל הפודים:"
-                        kubectl get pods
-                        
-                        echo "רשימת כל השירותים:"
-                        kubectl get services
+
                     """
                 }
             }
