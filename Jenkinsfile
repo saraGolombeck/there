@@ -147,7 +147,7 @@ stage('הרצת בדיקות E2E') {
             // העתקת סקריפט הבדיקות והרצתו
             sh """
                 # העתקת סקריפט הבדיקות לפוד
-                kubectl cp E2E_test/e2e-tests.sh e2e-tests:/e2e-tests.sh
+                kubectl cp E2E_test/test.sh e2e-tests:/e2e-tests.sh
                 
                 # הענקת הרשאות הרצה
                 kubectl exec e2e-tests -- chmod +x /test.sh
