@@ -230,7 +230,7 @@ pipeline {
                     // תיקון קובץ kubeconfig
                     sh """
                         # החלפת הכתובת לכתובת הפנימית של serverlb
-                        sed -i 's|server: https://0.0.0.0:9999|server: https://k3d-${params.CLUSTER_NAME}-serverlb:6443|g' \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+                        sed -i 's|server: https://0.0.0.0:9999|server: https://k3d-${params.CLUSTER_NAME}-serverlb:6444|g' \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
                         
                         # בדיקת התיקון
                         grep "server:" \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
