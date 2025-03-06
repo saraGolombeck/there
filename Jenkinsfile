@@ -358,7 +358,6 @@ pipeline {
                     sh """
                         k3d cluster create ${params.CLUSTER_NAME} \\
                         --agents ${params.NUM_AGENTS} \\
-                        --registry-use registry.k3d:5000 \\
                         -p \"${params.PORT_MAPPING}\" \\
                         --k3s-arg \"--no-deploy=traefik@server:*\" \\
                         --api-port 6443
