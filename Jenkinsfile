@@ -54,6 +54,7 @@ pipeline {
                     // תיקון קובץ kubeconfig - החלפת הכתובת לשם הדומיין הפנימי של serverlb
                     sh """
                         # החלפת 0.0.0.0 בשם הדומיין הפנימי של serverlb
+                        sed -i 's|server: https://0.0.0.0:6443|server: https://k3d-${params.CLUSTER_NAME}-serverlb:6443|g' \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
                         
                         # בדיקת התיקון
                         grep "server:" \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
@@ -132,51 +133,51 @@ pipeline {
             }
         }
         
-    //     stage('יצירת פוד בדיקות') {
-    //         steps {
-    //             script {
-    //                 // יצירת פוד הבדיקות עם הסביבה המתאימה
-    //                 sh """
-    //                     export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+        stage('יצירת פוד בדיקות') {
+            steps {
+                script {
+                    // יצירת פוד הבדיקות עם הסביבה המתאימה
+                    sh """
+                        export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
                         
-    //                     cat <<EOF > ${WORKSPACE}/e2e-test-pod.yaml
-    //                     apiVersion: v1
-    //                     kind: Pod
-    //                     metadata:
-    //                       name: e2e-tests
-    //                     spec:
-    //                       containers:
-    //                       - name: e2e-tests
-    //                         image: alpine:latest
-    //                         command: [ "sh", "-c", "apk add --no-cache curl postgresql-client && sleep 3600" ]
-    //                         env:
-    //                         - name: DB_HOST
-    //                           value: "db"
-    //                         - name: DB_USER
-    //                           valueFrom:
-    //                             secretKeyRef:
-    //                               name: db-secret
-    //                               key: POSTGRES_USER
-    //                         - name: DB_PASSWORD
-    //                           valueFrom:
-    //                             secretKeyRef:
-    //                               name: db-secret
-    //                               key: POSTGRES_PASSWORD
-    //                         - name: API_URL
-    //                           value: "http://be:3010/api/health"
-    //                         - name: FRONTEND_URL
-    //                           value: "http://fe"
-    //                     EOF
+                        cat <<EOF > ${WORKSPACE}/e2e-test-pod.yaml
+                        apiVersion: v1
+                        kind: Pod
+                        metadata:
+                          name: e2e-tests
+                        spec:
+                          containers:
+                          - name: e2e-tests
+                            image: alpine:latest
+                            command: [ "sh", "-c", "apk add --no-cache curl postgresql-client && sleep 3600" ]
+                            env:
+                            - name: DB_HOST
+                              value: "db"
+                            - name: DB_USER
+                              valueFrom:
+                                secretKeyRef:
+                                  name: db-secret
+                                  key: POSTGRES_USER
+                            - name: DB_PASSWORD
+                              valueFrom:
+                                secretKeyRef:
+                                  name: db-secret
+                                  key: POSTGRES_PASSWORD
+                            - name: API_URL
+                              value: "http://be:3010/api/health"
+                            - name: FRONTEND_URL
+                              value: "http://fe"
+                        EOF
                         
-    //                     kubectl apply -f ${WORKSPACE}/e2e-test-pod.yaml
+                        kubectl apply -f ${WORKSPACE}/e2e-test-pod.yaml
                         
-    //                     echo "המתנה לעליית פוד הבדיקות..."
-    //                     sleep 20
-    //                     kubectl get pod e2e-tests
-    //                 """
-    //             }
-    //         }
-    //     }
+                        echo "המתנה לעליית פוד הבדיקות..."
+                        sleep 20
+                        kubectl get pod e2e-tests
+                    """
+                }
+            }
+        }
         
     //     stage('הרצת בדיקות E2E') {
     //         steps {
@@ -252,5 +253,5 @@ pipeline {
     //         echo 'הסרת קבצים זמניים...'
     //         sh "rm -f ${WORKSPACE}/e2e-test-pod.yaml"
     //     }
-    // }
-    }}
+    }
+}
