@@ -210,8 +210,9 @@ pipeline {
         stage('יצירת קלאסטר חדש') {
             steps {
                 script {
-                    sh "k3d cluster create ${params.CLUSTER_NAME} --agents ${params.NUM_AGENTS} --registry-use registry.k3d:5000 -p \"${params.PORT_MAPPING}\""
-                    echo 'קלאסטר חדש נוצר בהצלחה.'
+                    // יצירת רג'יסטרי חדש במקום להשתמש בקיים
+                    sh "k3d cluster create ${params.CLUSTER_NAME} --agents ${params.NUM_AGENTS} --registry-create registry.k3d:5000 -p \"${params.PORT_MAPPING}\""
+                    echo 'קלאסטר חדש נוצר בהצלחה עם רג׳יסטרי מובנה.'
                     
                     // המתנה לצמתים להיות מוכנים
                     sh 'kubectl wait --for=condition=ready node --all --timeout=300s'
