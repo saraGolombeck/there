@@ -703,3 +703,78 @@ pipeline {
 //         }
 //     }
 // }
+
+pipeline {
+    agent any
+    
+    parameters {
+        string(name: 'CLUSTER_NAME', defaultValue: 'my-cluster', description: 'שם הקלאסטר')
+        string(name: 'NUM_AGENTS', defaultValue: '1', description: 'מספר צמתי העבודה')
+        string(name: 'PORT_MAPPING', defaultValue: '2222:80@loadbalancer', description: 'מיפוי פורטים')
+    }
+    
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+    }
+    
+    stages {
+        stage('מחיקת קלאסטר קיים') {
+            steps {
+                script {
+                    sh "k3d cluster delete ${params.CLUSTER_NAME} 2>/dev/null || true"
+                }
+            }
+        }
+        
+        stage('יצירת קלאסטר חדש') {
+            steps {
+                script {
+                    sh "mkdir -p \${HOME}/.kube"
+                    
+                    // קבלת כתובת IP של המחשב המארח
+                    sh "HOST_IP=\$(hostname -I | awk '{print \$1}')"
+                    
+                    // יצירת הקלאסטר עם כתובת ספציפית
+                    sh """
+                        k3d cluster create ${params.CLUSTER_NAME} \\
+                        --agents ${params.NUM_AGENTS} \\
+                        --timeout 5m \\
+                        --api-port \${HOST_IP}:9999 \\
+                        -p "${params.PORT_MAPPING}"
+                    """
+                    
+                    // יצירת קובץ kubeconfig
+                    sh "k3d kubeconfig get ${params.CLUSTER_NAME} > \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config"
+                    sh "chmod 600 \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config"
+                    
+                    // בדיקת ותיקון כתובת ה-API בקובץ
+                    sh """
+                        sed -i 's|server: https://0.0.0.0:9999|server: https://\${HOST_IP}:9999|g' \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+                        echo "תוכן קובץ kubeconfig:"
+                        cat \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+                    """
+                    
+                    // המתנה להתייצבות הקלאסטר
+                    sh "sleep 10"
+                }
+            }
+        }
+        
+        stage('בדיקת הגדרות חיבור') {
+            steps {
+                script {
+                    sh """
+                        export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+                        echo "Context נוכחי:"
+                        kubectl config current-context
+                        echo "פרטי החיבור:"
+                        kubectl config view | grep server
+                    """
+                }
+            }
+        }
+        
+        // שאר השלבים נשארים ללא שינוי
+        // ...
+    }
+}
