@@ -211,7 +211,7 @@ pipeline {
             steps {
                 script {
                     // יצירת הקלאסטר עם הפקודה המלאה
-                    sh "k3d cluster create ${params.CLUSTER_NAME} --agents ${params.NUM_AGENTS} --registry-use registry.k3d:5000 -p \"${params.PORT_MAPPING}\""
+                    sh "k3d cluster create ${params.CLUSTER_NAME} --agents ${params.NUM_AGENTS} -p \"${params.PORT_MAPPING}\""
                     echo 'קלאסטר חדש נוצר בהצלחה.'
                     
                     // עדכון קובץ ה-kubeconfig באופן מפורש
