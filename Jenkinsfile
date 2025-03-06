@@ -148,12 +148,18 @@ stage('הרצת בדיקות E2E') {
                 # העתקת סקריפט הבדיקות לפוד
                 kubectl cp E2E_test/test.sh e2e-tests:/test.sh
                 
+                # בדיקה שהקובץ אכן הועתק
+                kubectl exec e2e-tests -- ls -la /
+                
                 # הענקת הרשאות הרצה
                 kubectl exec e2e-tests -- chmod +x /test.sh
                 
-                # הרצת הבדיקות
+                # בדיקה נוספת של הרשאות
+                kubectl exec e2e-tests -- ls -la /test.sh
+                
+                # הרצת הבדיקות עם sh מפורש
                 echo "מריץ בדיקות..."
-                kubectl exec e2e-tests -- sh -c '/test.sh'
+                kubectl exec e2e-tests -- /bin/sh /test.sh
             """
         }
     }
