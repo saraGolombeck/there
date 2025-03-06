@@ -20,7 +20,7 @@ spec:
   containers:
   - name: e2e-tests
     image: alpine:latest
-    command: [ "sh", "-c", "apk add --no-cache curl postgresql-client && sleep 3600" ]
+    command: [ "sh", "-c", "apk add --no-cache curl postgresql-client && sleep 60" ]
     envFrom:
     - secretRef:
         name: e2e-env-secret
