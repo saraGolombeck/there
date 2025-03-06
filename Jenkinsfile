@@ -219,7 +219,7 @@ pipeline {
                         k3d cluster create ${params.CLUSTER_NAME} \\
                         --agents ${params.NUM_AGENTS} \\
                         --timeout 5m \\
-                        --api-port 6444 \\
+                        --api-port 6443 \\
                         -p "${params.PORT_MAPPING}"
                     """
                     
@@ -230,7 +230,7 @@ pipeline {
                     // תיקון קובץ kubeconfig
                     sh """
                         # החלפת הכתובת לכתובת הפנימית של serverlb
-                        sed -i 's|server: https://0.0.0.0:9999|server: https://k3d-${params.CLUSTER_NAME}-serverlb:6444|g' \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+                        sed -i 's|server: https://0.0.0.0:9999|server: https://k3d-${params.CLUSTER_NAME}-serverlb:6443|g' \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
                         
                         # בדיקת התיקון
                         grep "server:" \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
