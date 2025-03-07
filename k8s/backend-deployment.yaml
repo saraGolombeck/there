@@ -15,7 +15,7 @@ spec:
         app: backend
     spec:
       nodeSelector:
-        kubernetes.io/hostname: k3d-my-cluster-agent-0
+        kubernetes.io/hostname: my-cluster-m02
       containers:
       - name: backend
         image: ghcr.io/le7-devops/backend:latest  

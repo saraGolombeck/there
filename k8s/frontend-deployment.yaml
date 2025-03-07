@@ -15,7 +15,7 @@ spec:
         app: frontend
     spec:
       nodeSelector:
-        kubernetes.io/hostname: k3d-my-cluster-agent-0
+        kubernetes.io/hostname: my-cluster-m02
       containers:
       - name: frontend
         # image: 10.100.127.57/frontend1:latest
