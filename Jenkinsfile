@@ -254,10 +254,10 @@ pipeline {
                 script {
                     sh """
                         # Create directory for split test files
-                        mkdir -p ${WORKSPACE}/E2E_test/parallel
+                        mkdir -p \${WORKSPACE}/E2E_test/parallel
                         
                         # Split test file into 3 parts (assuming test.sh contains multiple test cases)
-                        cd ${WORKSPACE}/E2E_test
+                        cd \${WORKSPACE}/E2E_test
                         
                         # Count total number of test cases (assumed to be marked with "test_case" comment)
                         TOTAL_TESTS=\$(grep -c "test_case" test.sh 2>/dev/null || echo "0")
@@ -348,8 +348,8 @@ EOL
                                 kubectl wait --for=condition=ready pod/e2e-tests-1 --timeout=60s
 
                                 # Copy test files
-                                kubectl cp ${WORKSPACE}/E2E_test/parallel/test_part0.sh e2e-tests-1:/test_part0.sh
-                                kubectl cp ${WORKSPACE}/E2E_test/test_runner_template.sh e2e-tests-1:/test_runner.sh
+                                kubectl cp \${WORKSPACE}/E2E_test/parallel/test_part0.sh e2e-tests-1:/test_part0.sh
+                                kubectl cp \${WORKSPACE}/E2E_test/test_runner_template.sh e2e-tests-1:/test_runner.sh
                                 
                                 # Run tests - use sh instead of bash as Alpine uses sh
                                 kubectl exec e2e-tests-1 -- sh -c "chmod +x /test_*.sh && sh /test_runner.sh 0"
@@ -379,8 +379,8 @@ EOL
                                 kubectl wait --for=condition=ready pod/e2e-tests-2 --timeout=60s
 
                                 # Copy test files
-                                kubectl cp ${WORKSPACE}/E2E_test/parallel/test_part1.sh e2e-tests-2:/test_part1.sh
-                                kubectl cp ${WORKSPACE}/E2E_test/test_runner_template.sh e2e-tests-2:/test_runner.sh
+                                kubectl cp \${WORKSPACE}/E2E_test/parallel/test_part1.sh e2e-tests-2:/test_part1.sh
+                                kubectl cp \${WORKSPACE}/E2E_test/test_runner_template.sh e2e-tests-2:/test_runner.sh
                                 
                                 # Run tests - use sh instead of bash as Alpine uses sh
                                 kubectl exec e2e-tests-2 -- sh -c "chmod +x /test_*.sh && sh /test_runner.sh 1"
@@ -410,8 +410,8 @@ EOL
                                 kubectl wait --for=condition=ready pod/e2e-tests-3 --timeout=60s
 
                                 # Copy test files
-                                kubectl cp ${WORKSPACE}/E2E_test/parallel/test_part2.sh e2e-tests-3:/test_part2.sh
-                                kubectl cp ${WORKSPACE}/E2E_test/test_runner_template.sh e2e-tests-3:/test_runner.sh
+                                kubectl cp \${WORKSPACE}/E2E_test/parallel/test_part2.sh e2e-tests-3:/test_part2.sh
+                                kubectl cp \${WORKSPACE}/E2E_test/test_runner_template.sh e2e-tests-3:/test_runner.sh
                                 
                                 # Run tests - use sh instead of bash as Alpine uses sh
                                 kubectl exec e2e-tests-3 -- sh -c "chmod +x /test_*.sh && sh /test_runner.sh 2"
@@ -431,7 +431,7 @@ EOL
                         
                         # Clean up temporary files
                         rm -f pod-test*.yaml
-                        rm -rf ${WORKSPACE}/E2E_test/parallel
+                        rm -rf \${WORKSPACE}/E2E_test/parallel
                     """
                 }
             }
