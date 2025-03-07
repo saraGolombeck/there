@@ -557,6 +557,53 @@ pipeline {
             }
         }
         
+
+                stage('Generate Test Report') {
+            steps {
+                script {
+                    echo "Collecting test results..."
+                    
+                    // Create directory for test reports
+                    sh "mkdir -p test-reports"
+                    
+                    // Extract test results from pod
+                    sh '''
+                        kubectl exec e2e-tests -- ls -la /tmp/ || true
+                        for result in db_test_result.txt api_test_result.txt frontend_test_result.txt integration_test_result.txt; do
+                            kubectl cp e2e-tests:/tmp/$result test-reports/$result 2>/dev/null || echo "Could not copy $result"
+                        done
+                    '''
+                    
+                    // Create a simple HTML report
+                    sh '''
+                        echo "<html><head><title>E2E Test Results</title>" > test-reports/report.html
+                        echo "<style>body{font-family:Arial;margin:20px}h1{color:#333}pre{background:#f5f5f5;padding:10px;border-radius:5px}</style>" >> test-reports/report.html
+                        echo "</head><body><h1>E2E Test Results</h1>" >> test-reports/report.html
+                        
+                        echo "<h2>Summary</h2>" >> test-reports/report.html
+                        echo "<pre>" >> test-reports/report.html
+                        grep -H "" test-reports/*.txt 2>/dev/null || echo "No test results found" >> test-reports/report.html
+                        echo "</pre>" >> test-reports/report.html
+                        
+                        echo "<h2>Detailed Results</h2>" >> test-reports/report.html
+                        for file in test-reports/*.txt; do
+                            if [ -f "$file" ]; then
+                                echo "<h3>$(basename $file)</h3>" >> test-reports/report.html
+                                echo "<pre>" >> test-reports/report.html
+                                cat "$file" >> test-reports/report.html
+                                echo "</pre>" >> test-reports/report.html
+                            fi
+                        done
+                        
+                        echo "</body></html>" >> test-reports/report.html
+                    '''
+                    
+                    // Archive the test report
+                    archiveArtifacts artifacts: 'test-reports/**', allowEmptyArchive: true
+                }
+            }
+        }
+
         stage('Cleanup') {
             steps {
                 script {
