@@ -260,35 +260,62 @@ pipeline {
                         cd ${WORKSPACE}/E2E_test
                         
                         # Count total number of test cases (assumed to be marked with "test_case" comment)
-                        TOTAL_TESTS=\$(grep -c "test_case" test.sh || echo 0)
+                        TOTAL_TESTS=\$(grep -c "test_case" test.sh 2>/dev/null || echo "0")
+                        
+                        # Make sure we have a valid number
+                        if ! [[ \$TOTAL_TESTS =~ ^[0-9]+$ ]]; then
+                            TOTAL_TESTS=0
+                        fi
                         
                         # Calculate tests per file (at least 1)
-                        TESTS_PER_FILE=\$(( (TOTAL_TESTS + 2) / 3 ))
-                        if [ \$TESTS_PER_FILE -lt 1 ]; then
+                        if [ \$TOTAL_TESTS -eq 0 ]; then
                             TESTS_PER_FILE=1
+                        else
+                            TESTS_PER_FILE=\$(( (TOTAL_TESTS + 2) / 3 ))
+                            if [ \$TESTS_PER_FILE -lt 1 ]; then
+                                TESTS_PER_FILE=1
+                            fi
                         fi
                         
                         # Create test runner script template
                         cat > test_runner_template.sh << 'EOL'
-#!/bin/bash
+#!/bin/sh
 set -e
-echo "Starting test part \$1..."
+echo "Starting test part $1..."
 # Setup common environment
 export TEST_ENV="k8s"
 # Run the specific test part
-source /test_part\$1.sh
-echo "Test part \$1 completed successfully"
+. /test_part$1.sh
+echo "Test part $1 completed successfully"
 EOL
                         
                         # Split test file into 3 parts
                         csplit --prefix="parallel/test_part" --suffix-format="%1d.sh" test.sh "/test_case/" "\$TESTS_PER_FILE" "{2}" 2>/dev/null || true
                         
-                        # If split didn't work properly (not enough test_case markers), just create 3 copies
-                        if [ ! -f parallel/test_part1.sh ]; then
-                            cat test.sh > parallel/test_part0.sh
-                            cp parallel/test_part0.sh parallel/test_part1.sh
-                            cp parallel/test_part0.sh parallel/test_part2.sh
-                        fi
+                        # Since we can't rely on csplit (or it might not find markers), let's manually create 3 parts
+                        # from the test.sh file, each with approximately 1/3 of the content
+                        
+                        # Get total line count of test.sh
+                        TOTAL_LINES=\$(wc -l < test.sh)
+                        LINES_PER_PART=\$(( (TOTAL_LINES + 2) / 3 ))
+                        
+                        # Create 3 parts with head and tail
+                        head -n \$LINES_PER_PART test.sh > parallel/test_part0.sh
+                        
+                        START=\$(( LINES_PER_PART + 1 ))
+                        END=\$(( LINES_PER_PART * 2 ))
+                        sed -n "\${START},\${END}p" test.sh > parallel/test_part1.sh
+                        
+                        START=\$(( LINES_PER_PART * 2 + 1 ))
+                        tail -n +\$START test.sh > parallel/test_part2.sh
+                        
+                        # Add header to each part if they're empty
+                        for i in 0 1 2; do
+                            if [ ! -s parallel/test_part\$i.sh ]; then
+                                echo "#!/bin/sh" > parallel/test_part\$i.sh
+                                echo "echo 'No tests to run in part \$i'" >> parallel/test_part\$i.sh
+                            fi
+                        done
                         
                         # Make split files executable
                         chmod +x parallel/test_part*.sh
@@ -324,8 +351,8 @@ EOL
                                 kubectl cp ${WORKSPACE}/E2E_test/parallel/test_part0.sh e2e-tests-1:/test_part0.sh
                                 kubectl cp ${WORKSPACE}/E2E_test/test_runner_template.sh e2e-tests-1:/test_runner.sh
                                 
-                                # Run tests
-                                kubectl exec e2e-tests-1 -- sh -c "chmod +x /test_*.sh && /test_runner.sh 0"
+                                # Run tests - use sh instead of bash as Alpine uses sh
+                                kubectl exec e2e-tests-1 -- sh -c "chmod +x /test_*.sh && sh /test_runner.sh 0"
                             """
                         }
                     }
@@ -355,8 +382,8 @@ EOL
                                 kubectl cp ${WORKSPACE}/E2E_test/parallel/test_part1.sh e2e-tests-2:/test_part1.sh
                                 kubectl cp ${WORKSPACE}/E2E_test/test_runner_template.sh e2e-tests-2:/test_runner.sh
                                 
-                                # Run tests
-                                kubectl exec e2e-tests-2 -- sh -c "chmod +x /test_*.sh && /test_runner.sh 1"
+                                # Run tests - use sh instead of bash as Alpine uses sh
+                                kubectl exec e2e-tests-2 -- sh -c "chmod +x /test_*.sh && sh /test_runner.sh 1"
                             """
                         }
                     }
@@ -386,8 +413,8 @@ EOL
                                 kubectl cp ${WORKSPACE}/E2E_test/parallel/test_part2.sh e2e-tests-3:/test_part2.sh
                                 kubectl cp ${WORKSPACE}/E2E_test/test_runner_template.sh e2e-tests-3:/test_runner.sh
                                 
-                                # Run tests
-                                kubectl exec e2e-tests-3 -- sh -c "chmod +x /test_*.sh && /test_runner.sh 2"
+                                # Run tests - use sh instead of bash as Alpine uses sh
+                                kubectl exec e2e-tests-3 -- sh -c "chmod +x /test_*.sh && sh /test_runner.sh 2"
                             """
                         }
                     }
