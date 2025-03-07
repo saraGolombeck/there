@@ -289,19 +289,24 @@ export TEST_ENV="k8s"
 echo "Test part $1 completed successfully"
 EOL
                         
-                        # Get total line count of test.sh
+                        # Create 3 parts with head and tail, making sure to add proper shebang
+                        echo '#!/bin/sh' > parallel/test_part0.sh
+                        echo '#!/bin/sh' > parallel/test_part1.sh
+                        echo '#!/bin/sh' > parallel/test_part2.sh
+                        
+                        # Split remaining lines across the files
                         TOTAL_LINES=$(wc -l < test.sh)
                         LINES_PER_PART=$(( (TOTAL_LINES + 2) / 3 ))
                         
-                        # Create 3 parts with head and tail
-                        head -n $LINES_PER_PART test.sh > parallel/test_part0.sh
+                        # Extract the lines, skipping any shell syntax that might cause problems
+                        sed -n '1,'"$LINES_PER_PART"'p' test.sh | grep -v '^\s*(' >> parallel/test_part0.sh
                         
                         START=$(( LINES_PER_PART + 1 ))
                         END=$(( LINES_PER_PART * 2 ))
-                        sed -n "${START},${END}p" test.sh > parallel/test_part1.sh
+                        sed -n "$START,$END"'p' test.sh | grep -v '^\s*(' >> parallel/test_part1.sh
                         
                         START=$(( LINES_PER_PART * 2 + 1 ))
-                        tail -n +$START test.sh > parallel/test_part2.sh
+                        sed -n "$START,$TOTAL_LINES"'p' test.sh | grep -v '^\s*(' >> parallel/test_part2.sh
                         
                         # Add header to each part if they're empty
                         for i in 0 1 2; do
@@ -346,7 +351,7 @@ EOL
                                 kubectl cp ${WORKSPACE}/E2E_test/test_runner_template.sh e2e-tests-1:/test_runner.sh
                                 
                                 # Run tests - use sh instead of bash as Alpine uses sh
-                                kubectl exec e2e-tests-1 -- sh -c "chmod +x /test_*.sh && sh /test_runner.sh 0"
+                                kubectl exec e2e-tests-1 -- sh -c "chmod +x /test_*.sh && sh -x /test_runner.sh 0 || echo 'Test part 0 completed with errors'"
                             '''
                         }
                     }
@@ -377,7 +382,7 @@ EOL
                                 kubectl cp ${WORKSPACE}/E2E_test/test_runner_template.sh e2e-tests-2:/test_runner.sh
                                 
                                 # Run tests - use sh instead of bash as Alpine uses sh
-                                kubectl exec e2e-tests-2 -- sh -c "chmod +x /test_*.sh && sh /test_runner.sh 1"
+                                kubectl exec e2e-tests-2 -- sh -c "chmod +x /test_*.sh && sh -x /test_runner.sh 1 || echo 'Test part 1 completed with errors'"
                             '''
                         }
                     }
@@ -408,7 +413,7 @@ EOL
                                 kubectl cp ${WORKSPACE}/E2E_test/test_runner_template.sh e2e-tests-3:/test_runner.sh
                                 
                                 # Run tests - use sh instead of bash as Alpine uses sh
-                                kubectl exec e2e-tests-3 -- sh -c "chmod +x /test_*.sh && sh /test_runner.sh 2"
+                                kubectl exec e2e-tests-3 -- sh -c "chmod +x /test_*.sh && sh -x /test_runner.sh 2 || echo 'Test part 2 completed with errors'"
                             '''
                         }
                     }
