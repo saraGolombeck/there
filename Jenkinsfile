@@ -266,9 +266,9 @@ pipeline {
                     sh "chmod 600 \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config"
                     
                     // Fix kubeconfig - replace address with internal domain name
-                    sh """
-                        sed -i 's|server: https://0.0.0.0:6443|server: https://k3d-${params.CLUSTER_NAME}-serverlb:6443|g' \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
-                    """
+                    // sh """
+                    //     sed -i 's|server: https://0.0.0.0:6443|server: https://k3d-${params.CLUSTER_NAME}-serverlb:6443|g' \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+                    // """
                     
                     // Connect Jenkins container to k3d network
                     sh "docker network connect k3d-${params.CLUSTER_NAME} \$HOSTNAME || true"
