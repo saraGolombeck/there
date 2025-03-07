@@ -1055,8 +1055,22 @@ pipeline {
         stage('Create E2E test secrets') {
             steps {
                 script {
-                    // Apply the secret directly from the credential file
-                    sh "cat ${E2E_SECRET_YAML} | kubectl apply -f -"
+                    // Apply the secret using withCredentials and a temp file approach
+                    withCredentials([string(credentialsId: 'e2e-secret-yaml', variable: 'SECRET_CONTENT')]) {
+                        sh '''
+                            # Create a temporary file
+                            SECRET_FILE=$(mktemp)
+                            
+                            # Write secret content to file
+                            echo "$SECRET_CONTENT" > $SECRET_FILE
+                            
+                            # Apply the secret
+                            kubectl apply -f $SECRET_FILE
+                            
+                            # Remove temporary file
+                            rm $SECRET_FILE
+                        '''
+                    }
                 }
             }
         }
