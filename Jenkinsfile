@@ -172,155 +172,43 @@ pipeline {
     stages {
         stage('Delete existing cluster') {
             steps {
-                script {
-                    sh "k3d cluster delete ${params.CLUSTER_NAME} 2>/dev/null || true"
-                }
+                sh "k3d cluster delete ${params.CLUSTER_NAME} 2>/dev/null || true"
             }
         }
         
         stage('Create new cluster') {
             steps {
-                script {
-                    sh "mkdir -p \${HOME}/.kube"
-                    
-                    // Create cluster
-                    sh """
-                        k3d cluster create ${params.CLUSTER_NAME} \\
-                        --agents ${params.NUM_AGENTS} \\
-                        --timeout 5m \\
-                        --api-port 6443 \\
-                        -p "${params.PORT_MAPPING}"
-                    """
-                    
-                    // Create kubeconfig file
-                    sh "k3d kubeconfig get ${params.CLUSTER_NAME} > \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config"
-                    sh "chmod 600 \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config"
-                    
-                    // Fix kubeconfig - replace address with internal domain name
-                    sh '''
-                        sed -i "s|server: https://0.0.0.0:6443|server: https://k3d-'''+params.CLUSTER_NAME+'''-serverlb:6443|g" ${HOME}/.kube/k3d-'''+params.CLUSTER_NAME+'''.config
-                    '''
-                    
-                    // Connect Jenkins container to k3d network
-                    sh "docker network connect k3d-${params.CLUSTER_NAME} \${HOSTNAME} || true"
-                    
-                    // Wait for cluster to stabilize
-                    sh "sleep 10"
-                }
+                sh "mkdir -p ${HOME}/.kube"
+                sh "k3d cluster create ${params.CLUSTER_NAME} --agents ${params.NUM_AGENTS} --timeout 5m --api-port 6443 -p \"${params.PORT_MAPPING}\""
+                sh "k3d kubeconfig get ${params.CLUSTER_NAME} > ${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config"
+                sh "chmod 600 ${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config"
+                sh "sed -i 's|server: https://0.0.0.0:6443|server: https://k3d-${params.CLUSTER_NAME}-serverlb:6443|g' ${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config"
+                sh "docker network connect k3d-${params.CLUSTER_NAME} ${HOSTNAME} || true"
+                sh "sleep 10" // Wait for cluster to stabilize
             }
         }
         
         stage('Set node labels') {
             steps {
-                script {
-                    sh '''
-                        export KUBECONFIG=${HOME}/.kube/k3d-'''+params.CLUSTER_NAME+'''.config
-                        kubectl config use-context k3d-'''+params.CLUSTER_NAME+'''
-                        
-                        # Get all nodes
-                        ALL_NODES=$(kubectl get nodes --no-headers | awk '{print $1}')
-                        
-                        # Identify master and worker nodes
-                        for NODE in $ALL_NODES; do
-                            if [ "$(echo $NODE | grep server)" != "" ]; then
-                                kubectl label nodes $NODE kubernetes.io/hostname='''+params.CLUSTER_NAME+''' --overwrite
-                            elif [ "$(echo $NODE | grep agent)" != "" ]; then
-                                kubectl label nodes $NODE kubernetes.io/hostname='''+params.CLUSTER_NAME+'''-m02 --overwrite
-                            fi
-                        done
-                    '''
-                }
+                sh label_script()
             }
         }
 
         stage('Deploy application') {
             steps {
-                script {
-                    sh "kubectl apply -k k8s/"
-                }
+                sh "kubectl apply -k k8s/"
             }
         }
         
         stage('Create secret for tests') {
             steps {
-                script {
-                    sh "kubectl apply -f E2E_test/secret.yaml"
-                }
+                sh "kubectl apply -f E2E_test/secret.yaml"
             }
         }
         
-        stage('Prepare tests for parallel execution') {
+        stage('Prepare tests for parallel') {
             steps {
-                script {
-                    sh '''
-                        # Create directory for split test files
-                        mkdir -p ${WORKSPACE}/E2E_test/parallel
-                        
-                        # Split test file into 3 parts (assuming test.sh contains multiple test cases)
-                        cd ${WORKSPACE}/E2E_test
-                        
-                        # Count total number of test cases (assumed to be marked with "test_case" comment)
-                        TOTAL_TESTS=$(grep -c "test_case" test.sh 2>/dev/null || echo "0")
-                        
-                        # Make sure we have a valid number
-                        if ! [ "$TOTAL_TESTS" -eq "$TOTAL_TESTS" 2>/dev/null ]; then
-                            TOTAL_TESTS=0
-                        fi
-                        
-                        # Calculate tests per file (at least 1)
-                        if [ $TOTAL_TESTS -eq 0 ]; then
-                            TESTS_PER_FILE=1
-                        else
-                            TESTS_PER_FILE=$(( (TOTAL_TESTS + 2) / 3 ))
-                            if [ $TESTS_PER_FILE -lt 1 ]; then
-                                TESTS_PER_FILE=1
-                            fi
-                        fi
-                        
-                        # Create test runner script template
-                        cat > test_runner_template.sh << 'EOL'
-#!/bin/sh
-set -e
-echo "Starting test part $1..."
-# Setup common environment
-export TEST_ENV="k8s"
-# Run the specific test part
-. /test_part$1.sh
-echo "Test part $1 completed successfully"
-EOL
-                        
-                        # Create 3 parts with head and tail, making sure to add proper shebang
-                        echo '#!/bin/sh' > parallel/test_part0.sh
-                        echo '#!/bin/sh' > parallel/test_part1.sh
-                        echo '#!/bin/sh' > parallel/test_part2.sh
-                        
-                        # Split remaining lines across the files
-                        TOTAL_LINES=$(wc -l < test.sh)
-                        LINES_PER_PART=$(( (TOTAL_LINES + 2) / 3 ))
-                        
-                        # Extract the lines, skipping any shell syntax that might cause problems
-                        sed -n '1,'"$LINES_PER_PART"'p' test.sh | grep -v '^\s*(' >> parallel/test_part0.sh
-                        
-                        START=$(( LINES_PER_PART + 1 ))
-                        END=$(( LINES_PER_PART * 2 ))
-                        sed -n "$START,$END"'p' test.sh | grep -v '^\s*(' >> parallel/test_part1.sh
-                        
-                        START=$(( LINES_PER_PART * 2 + 1 ))
-                        sed -n "$START,$TOTAL_LINES"'p' test.sh | grep -v '^\s*(' >> parallel/test_part2.sh
-                        
-                        # Add header to each part if they're empty
-                        for i in 0 1 2; do
-                            if [ ! -s parallel/test_part$i.sh ]; then
-                                echo "#!/bin/sh" > parallel/test_part$i.sh
-                                echo "echo 'No tests to run in part $i'" >> parallel/test_part$i.sh
-                            fi
-                        done
-                        
-                        # Make split files executable
-                        chmod +x parallel/test_part*.sh
-                        chmod +x test_runner_template.sh
-                    '''
-                }
+                sh prepare_tests_script()
             }
         }
         
@@ -328,94 +216,19 @@ EOL
             parallel {
                 stage('Test Part 1') {
                     steps {
-                        script {
-                            sh '''
-                                # Create test pod 1
-                                cat > pod-test1.yaml << EOL
-apiVersion: v1
-kind: Pod
-metadata:
-  name: e2e-tests-1
-spec:
-  containers:
-  - name: test-runner
-    image: alpine:latest
-    command: ["sleep", "3600"]
-  restartPolicy: Never
-EOL
-                                kubectl apply -f pod-test1.yaml
-                                kubectl wait --for=condition=ready pod/e2e-tests-1 --timeout=60s
-
-                                # Copy test files
-                                kubectl cp ${WORKSPACE}/E2E_test/parallel/test_part0.sh e2e-tests-1:/test_part0.sh
-                                kubectl cp ${WORKSPACE}/E2E_test/test_runner_template.sh e2e-tests-1:/test_runner.sh
-                                
-                                # Run tests - use sh instead of bash as Alpine uses sh
-                                kubectl exec e2e-tests-1 -- sh -c "chmod +x /test_*.sh && sh -x /test_runner.sh 0 || echo 'Test part 0 completed with errors'"
-                            '''
-                        }
+                        sh run_test_script(1)
                     }
                 }
                 
                 stage('Test Part 2') {
                     steps {
-                        script {
-                            sh '''
-                                # Create test pod 2
-                                cat > pod-test2.yaml << EOL
-apiVersion: v1
-kind: Pod
-metadata:
-  name: e2e-tests-2
-spec:
-  containers:
-  - name: test-runner
-    image: alpine:latest
-    command: ["sleep", "3600"]
-  restartPolicy: Never
-EOL
-                                kubectl apply -f pod-test2.yaml
-                                kubectl wait --for=condition=ready pod/e2e-tests-2 --timeout=60s
-
-                                # Copy test files
-                                kubectl cp ${WORKSPACE}/E2E_test/parallel/test_part1.sh e2e-tests-2:/test_part1.sh
-                                kubectl cp ${WORKSPACE}/E2E_test/test_runner_template.sh e2e-tests-2:/test_runner.sh
-                                
-                                # Run tests - use sh instead of bash as Alpine uses sh
-                                kubectl exec e2e-tests-2 -- sh -c "chmod +x /test_*.sh && sh -x /test_runner.sh 1 || echo 'Test part 1 completed with errors'"
-                            '''
-                        }
+                        sh run_test_script(2)
                     }
                 }
                 
                 stage('Test Part 3') {
                     steps {
-                        script {
-                            sh '''
-                                # Create test pod 3
-                                cat > pod-test3.yaml << EOL
-apiVersion: v1
-kind: Pod
-metadata:
-  name: e2e-tests-3
-spec:
-  containers:
-  - name: test-runner
-    image: alpine:latest
-    command: ["sleep", "3600"]
-  restartPolicy: Never
-EOL
-                                kubectl apply -f pod-test3.yaml
-                                kubectl wait --for=condition=ready pod/e2e-tests-3 --timeout=60s
-
-                                # Copy test files
-                                kubectl cp ${WORKSPACE}/E2E_test/parallel/test_part2.sh e2e-tests-3:/test_part2.sh
-                                kubectl cp ${WORKSPACE}/E2E_test/test_runner_template.sh e2e-tests-3:/test_runner.sh
-                                
-                                # Run tests - use sh instead of bash as Alpine uses sh
-                                kubectl exec e2e-tests-3 -- sh -c "chmod +x /test_*.sh && sh -x /test_runner.sh 2 || echo 'Test part 2 completed with errors'"
-                            '''
-                        }
+                        sh run_test_script(3)
                     }
                 }
             }
@@ -423,32 +236,119 @@ EOL
         
         stage('Cleanup') {
             steps {
-                script {
-                    sh '''
-                        # Delete test pods
-                        kubectl delete pod e2e-tests-1 e2e-tests-2 e2e-tests-3 --ignore-not-found
-                        
-                        # Clean up temporary files
-                        rm -f pod-test*.yaml
-                        rm -rf ${WORKSPACE}/E2E_test/parallel
-                    '''
-                }
+                sh "kubectl delete pod e2e-tests-1 e2e-tests-2 e2e-tests-3 --ignore-not-found"
+                sh "rm -f pod-test*.yaml"
+                sh "rm -rf ${WORKSPACE}/E2E_test/parallel || true"
             }
         }
     }
     
     post {
         success {
-            echo """
-            K3D Kubernetes cluster setup and tests completed successfully!
-            
-            To connect to the cluster, use:
-            export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
-            kubectl get pods
-            """
+            echo "K3D Kubernetes cluster setup and tests completed successfully!"
+            echo "To connect to the cluster, use:"
+            echo "export KUBECONFIG=${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config"
+            echo "kubectl get pods"
         }
         failure {
             echo 'K3D Kubernetes cluster setup or tests failed.'
         }
     }
+}
+
+// Helper methods to generate scripts
+def label_script() {
+    return '''#!/bin/bash
+export KUBECONFIG=${HOME}/.kube/k3d-''' + params.CLUSTER_NAME + '''.config
+kubectl config use-context k3d-''' + params.CLUSTER_NAME + '''
+
+# Get all nodes
+ALL_NODES=$(kubectl get nodes --no-headers | awk '{print $1}')
+
+# Identify master and worker nodes
+for NODE in $ALL_NODES; do
+    if [ "$(echo $NODE | grep server)" != "" ]; then
+        kubectl label nodes $NODE kubernetes.io/hostname=''' + params.CLUSTER_NAME + ''' --overwrite
+    elif [ "$(echo $NODE | grep agent)" != "" ]; then
+        kubectl label nodes $NODE kubernetes.io/hostname=''' + params.CLUSTER_NAME + '''-m02 --overwrite
+    fi
+done
+'''
+}
+
+def prepare_tests_script() {
+    return '''#!/bin/bash
+# Create directory for split test files
+mkdir -p ${WORKSPACE}/E2E_test/parallel
+
+# Split test file into 3 parts
+cd ${WORKSPACE}/E2E_test
+
+# Create test runner script
+cat > test_runner.sh << 'EOFRUNNER'
+#!/bin/sh
+set -e
+echo "Starting test part $1..."
+export TEST_ENV="k8s"
+sh /test_part$1.sh
+echo "Test part $1 completed successfully"
+EOFRUNNER
+chmod +x test_runner.sh
+
+# Count lines in test.sh
+LINES=$(wc -l < test.sh)
+PART_SIZE=$((LINES / 3 + 1))
+
+# Create part 1
+cat > parallel/test_part1.sh << 'EOF1'
+#!/bin/sh
+echo "Running test part 1"
+EOF1
+head -n $PART_SIZE test.sh >> parallel/test_part1.sh
+
+# Create part 2
+cat > parallel/test_part2.sh << 'EOF2'
+#!/bin/sh
+echo "Running test part 2"
+EOF2
+head -n $((PART_SIZE*2)) test.sh | tail -n $PART_SIZE >> parallel/test_part2.sh
+
+# Create part 3
+cat > parallel/test_part3.sh << 'EOF3'
+#!/bin/sh
+echo "Running test part 3"
+EOF3
+tail -n +$((PART_SIZE*2+1)) test.sh >> parallel/test_part3.sh
+
+# Make files executable
+chmod +x parallel/test_part*.sh
+'''
+}
+
+def run_test_script(int part) {
+    return '''#!/bin/bash
+# Create test pod ''' + part + '''
+cat > pod-test''' + part + '''.yaml << EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: e2e-tests-''' + part + '''
+spec:
+  containers:
+  - name: test-runner
+    image: alpine:latest
+    command: ["sleep", "3600"]
+  restartPolicy: Never
+EOF
+
+kubectl apply -f pod-test''' + part + '''.yaml
+kubectl wait --for=condition=ready pod/e2e-tests-''' + part + ''' --timeout=60s
+
+# Copy test files
+kubectl cp ${WORKSPACE}/E2E_test/parallel/test_part''' + part + '''.sh e2e-tests-''' + part + ''':/test_part''' + part + '''.sh
+kubectl cp ${WORKSPACE}/E2E_test/test_runner.sh e2e-tests-''' + part + ''':/test_runner.sh
+
+# Run tests
+kubectl exec e2e-tests-''' + part + ''' -- sh -c "chmod +x /test_*.sh && sh /test_runner.sh ''' + part + ''' || echo 'Test part ''' + part + ''' had errors'"
+'''
 }
