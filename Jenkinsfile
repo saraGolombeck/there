@@ -366,7 +366,8 @@ pipeline {
         stage('Prepare k3d Environment') {
             steps {
                 script {
-                    echo "Preparing environment for k3d Kubernetes cluster"                                      
+                    echo "Preparing environment for k3d Kubernetes cluster"
+
                     
                     // Install k3d if not present or update
                     sh '''
@@ -387,21 +388,25 @@ pipeline {
                         k3d version
                     '''
                     
-                    // Install kubectl if not present or update
+                    // Check for kubectl and get version information
                     sh '''
-                        if ! command -v kubectl &> /dev/null; then
+                        if command -v kubectl &> /dev/null; then
+                            echo "kubectl is already installed"
+                            kubectl version --client
+                        else
                             echo "kubectl is not installed. Installing kubectl..."
-                            if [ "${params.KUBECTL_VERSION}" == "latest" ]; then
-                                curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                            if [ "${params.KUBECTL_VERSION}" = "latest" ]; then
+                                # Get stable version without subshell command substitution
+                                STABLE_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
+                                curl -LO "https://dl.k8s.io/release/${STABLE_VERSION}/bin/linux/amd64/kubectl"
                             else
                                 curl -LO "https://dl.k8s.io/release/v${params.KUBECTL_VERSION}/bin/linux/amd64/kubectl"
                             fi
                             chmod +x kubectl
                             sudo mv kubectl /usr/local/bin/
                             echo "kubectl installed successfully"
+                            kubectl version --client
                         fi
-                        
-                        kubectl version --client
                     '''
                     
                     // Ensure .kube directory exists
