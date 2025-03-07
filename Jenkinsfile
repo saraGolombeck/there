@@ -217,30 +217,21 @@
 //     }
 // }
 
-
-
-
-
-
-///with
-
-
-
 pipeline {
     agent any
     
     triggers {
-        cron('H */2 * * *') // רץ כל שעתיים
+        cron('H */2 * * *') // Runs every 2 hours
     }
     
     parameters {
-        string(name: 'CLUSTER_NAME', defaultValue: 'my-cluster', description: 'שם הקלאסטר')
-        string(name: 'PORT_MAPPING', defaultValue: '2222:80@loadbalancer', description: 'מיפוי פורטים')
+        string(name: 'CLUSTER_NAME', defaultValue: 'my-cluster', description: 'Cluster name')
+        string(name: 'NUM_AGENTS', defaultValue: '1', description: 'Number of worker nodes')
+        string(name: 'PORT_MAPPING', defaultValue: '2222:80@loadbalancer', description: 'Port mapping')
     }
     
     environment {
-        // שימוש בקרדנשיאלס לקובץ הקונפיג
-        KUBE_CONFIG_ID = 'k3d-cluster-credentials'
+        KUBECONFIG = "${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config"
     }
     
     options {
@@ -248,110 +239,110 @@ pipeline {
     }
     
     stages {
-        stage('בדיקת זמינות הקלאסטר') {
+        stage('Delete existing cluster') {
             steps {
-                withKubeConfig([credentialsId: env.KUBE_CONFIG_ID, contextName: "k3d-${params.CLUSTER_NAME}",skipTlsVerify: true]) {
+                script {
+                    sh "k3d cluster delete ${params.CLUSTER_NAME} 2>/dev/null || true"
+                }
+            }
+        }
+        
+        stage('Create new cluster') {
+            steps {
+                script {
+                    sh "mkdir -p \${HOME}/.kube"
+                    
+                    // Create cluster
                     sh """
-                        kubectl config set-cluster \$(kubectl config current-context) --insecure-skip-tls-verify=true
+                        k3d cluster create ${params.CLUSTER_NAME} \\
+                        --agents ${params.NUM_AGENTS} \\
+                        --timeout 5m \\
+                        --api-port 6443 \\
+                        -p "${params.PORT_MAPPING}"
+                    """
+                    
+                    // Create kubeconfig file
+                    sh "k3d kubeconfig get ${params.CLUSTER_NAME} > \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config"
+                    sh "chmod 600 \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config"
+                    
+                    // Fix kubeconfig - replace address with internal domain name
+                    sh """
+                        sed -i 's|server: https://0.0.0.0:6443|server: https://k3d-${params.CLUSTER_NAME}-serverlb:6443|g' \${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+                    """
+                    
+                    // Connect Jenkins container to k3d network
+                    sh "docker network connect k3d-${params.CLUSTER_NAME} \$HOSTNAME || true"
+                    
+                    // Wait for cluster to stabilize
+                    sh "sleep 10"
+                }
+            }
+        }
+        
+        stage('Set node labels') {
+            steps {
+                script {
+                    sh """
+                        export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+                        kubectl config use-context k3d-${params.CLUSTER_NAME}
+                        
+                        # Get all nodes
+                        ALL_NODES=\$(kubectl get nodes --no-headers | awk '{print \$1}')
+                        
+                        # Identify master and worker nodes
+                        for NODE in \$ALL_NODES; do
+                            if [[ "\$NODE" == *"server"* ]]; then
+                                kubectl label nodes \$NODE kubernetes.io/hostname=${params.CLUSTER_NAME} --overwrite
+                            elif [[ "\$NODE" == *"agent"* ]]; then
+                                kubectl label nodes \$NODE kubernetes.io/hostname=${params.CLUSTER_NAME}-m02 --overwrite
+                            fi
+                        done
+                    """
+                }
+            }
+        }
 
-                        echo "בודק גישה לקלאסטר ${params.CLUSTER_NAME}..."
-                        kubectl get nodes
-                        if [ \$? -ne 0 ]; then
-                            echo "שגיאה: לא ניתן להתחבר לקלאסטר ${params.CLUSTER_NAME}"
-                            exit 1
-                        fi
-                        echo "התחברות לקלאסטר ${params.CLUSTER_NAME} הצליחה"
-                    """
+        stage('Deploy application') {
+            steps {
+                script {
+                    sh "kubectl apply -k k8s/"
                 }
             }
         }
         
-        stage('הפעלת האפליקציה') {
+        stage('Create test pod') {
             steps {
-                withKubeConfig([credentialsId: env.KUBE_CONFIG_ID, contextName: "k3d-${params.CLUSTER_NAME}"]) {
-                    sh """
-                        kubectl apply -k k8s/
-                        
-                        # המתנה להתייצבות הפודים
-                        echo "ממתין להתייצבות האפליקציה..."
-                        sleep 10
-                        kubectl get pods
-                    """
+                script {
+                    sh "kubectl apply -f E2E_test/secret.yaml"
+                    sh "kubectl apply -f E2E_test/pod.yaml"
+                    
+                    // Wait for pod to be ready
+                    sh "kubectl wait --for=condition=ready pod/e2e-tests --timeout=60s || true"
                 }
             }
         }
         
-        stage('יצירת פוד בדיקות') {
+        stage('Run E2E tests') {
             steps {
-                withKubeConfig([credentialsId: env.KUBE_CONFIG_ID, contextName: "k3d-${params.CLUSTER_NAME}"]) {
+                script {
                     sh """
-                        # בדיקה שקובץ pod.yaml קיים
-                        ls -la ${WORKSPACE}/E2E_test/pod.yaml
-                        
-                        # יישום הסקרט
-                        kubectl apply -f E2E_test/secret.yaml
-                        
-                        # יישום הפוד ישירות מהקובץ הקיים
-                        kubectl apply -f ${WORKSPACE}/E2E_test/pod.yaml
-                        
-                        # המתנה שהפוד יהיה מוכן
-                        echo "ממתין שפוד הבדיקות יהיה מוכן..."
-                        sleep 10
-                        kubectl wait --for=condition=ready pod/e2e-tests --timeout=60s || true
-                        kubectl get pods
-                    """
-                }
-            }
-        }
-        
-        stage('הרצת בדיקות E2E') {
-            steps {
-                withKubeConfig([credentialsId: env.KUBE_CONFIG_ID, contextName: "k3d-${params.CLUSTER_NAME}"]) {
-                    sh """
-                        # העתקת סקריפט הבדיקות לפוד
+                        # Copy test script to pod
                         kubectl cp E2E_test/test.sh e2e-tests:/test.sh
                         
-                        # בדיקה שהקובץ אכן הועתק
-                        kubectl exec e2e-tests -- ls -la /
-                        
-                        # הענקת הרשאות הרצה
+                        # Grant execution permissions
                         kubectl exec e2e-tests -- chmod +x /test.sh
                         
-                        # הרצת הבדיקות עם bash מפורש
-                        echo "מריץ בדיקות..."
+                        # Run tests
                         kubectl exec e2e-tests -- bash /test.sh
                     """
                 }
             }
         }
         
-        stage('אימות האפליקציה') {
+        stage('Cleanup') {
             steps {
-                withKubeConfig([credentialsId: env.KUBE_CONFIG_ID, contextName: "k3d-${params.CLUSTER_NAME}"]) {
-                    sh """
-                        echo "בדיקת האפליקציה:"
-                        kubectl get pods
-                        
-                        echo "רשימת שירותים:"
-                        kubectl get services
-                        
-                        echo "לוגים של הפודים:"
-                        for pod in \$(kubectl get pods -o name | grep -v 'e2e-tests'); do
-                            echo "\\n==== לוגים של \$pod ===="
-                            kubectl logs \$pod --tail=20
-                        done
-                    """
-                }
-            }
-        }
-        
-        stage('ניקוי') {
-            steps {
-                withKubeConfig([credentialsId: env.KUBE_CONFIG_ID, contextName: "k3d-${params.CLUSTER_NAME}"]) {
-                    sh """
-                        # מחיקת פוד הבדיקות
-                        kubectl delete pod e2e-tests --ignore-not-found
-                    """
+                script {
+                    sh "kubectl delete pod e2e-tests --ignore-not-found"
                 }
             }
         }
@@ -360,17 +351,15 @@ pipeline {
     post {
         success {
             echo """
-            הפעלת האפליקציה על קלאסטר K3D Kubernetes והרצת בדיקות הושלמו בהצלחה!
+            K3D Kubernetes cluster setup and tests completed successfully!
             
-            הקלאסטר ${params.CLUSTER_NAME} פעיל ומריץ את האפליקציה.
+            To connect to the cluster, use:
+            export KUBECONFIG=\${HOME}/.kube/k3d-${params.CLUSTER_NAME}.config
+            kubectl get pods
             """
         }
         failure {
-            echo 'הפעלת האפליקציה או הרצת הבדיקות נכשלו.'
-        }
-        always {
-            echo 'הסרת קבצים זמניים...'
-            sh "rm -f ${WORKSPACE}/e2e-test-pod.yaml"
+            echo 'K3D Kubernetes cluster setup or tests failed.'
         }
     }
 }
