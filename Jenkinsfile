@@ -252,6 +252,8 @@ pipeline {
             steps {
                 withKubeConfig([credentialsId: env.KUBE_CONFIG_ID, contextName: "k3d-${params.CLUSTER_NAME}"]) {
                     sh """
+                        kubectl config set-cluster \$(kubectl config current-context) --insecure-skip-tls-verify=true
+
                         echo "בודק גישה לקלאסטר ${params.CLUSTER_NAME}..."
                         kubectl get nodes
                         if [ \$? -ne 0 ]; then
