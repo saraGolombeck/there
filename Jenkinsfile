@@ -250,7 +250,7 @@ pipeline {
     stages {
         stage('בדיקת זמינות הקלאסטר') {
             steps {
-                withKubeConfig([credentialsId: env.KUBE_CONFIG_ID, contextName: "k3d-${params.CLUSTER_NAME}"]) {
+                withKubeConfig([credentialsId: env.KUBE_CONFIG_ID, contextName: "k3d-${params.CLUSTER_NAME}",skipTlsVerify: true]) {
                     sh """
                         kubectl config set-cluster \$(kubectl config current-context) --insecure-skip-tls-verify=true
 
