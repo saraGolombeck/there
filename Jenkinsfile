@@ -916,7 +916,7 @@ pipeline {
         string(name: 'PORT_MAPPING', defaultValue: '2222:80@loadbalancer', description: 'Port mapping')
         string(name: 'K3D_VERSION', defaultValue: 'latest', description: 'k3d version to install')
         string(name: 'KUBECTL_VERSION', defaultValue: 'latest', description: 'kubectl version to install')
-        string(name: 'EMAIL_RECIPIENTS', defaultValue: 'team@example.com', description: 'Email recipients for notifications')
+        string(name: 'sara.beck.dev@gmail.com', defaultValue: 'team@example.com', description: 'Email recipients for notifications')
     }
     
     environment {
