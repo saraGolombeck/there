@@ -38,7 +38,6 @@ pipeline {
                             echo "k3d is not installed. Installing k3d..."
                             curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
                             echo "k3d installed successfully"
-                            echo "x, y, its run bh"
                         else
                             current_version=$(k3d version | grep k3d | cut -d' ' -f3)
                             echo "Current k3d version: $current_version"
@@ -91,7 +90,8 @@ pipeline {
             steps {
                 script {
                     sh "mkdir -p \${HOME}/.kube"
-                    
+                    sh "echo "x, y, its run bh""
+
                     // Create cluster
                     sh """
                         k3d cluster create ${params.CLUSTER_NAME} \\
