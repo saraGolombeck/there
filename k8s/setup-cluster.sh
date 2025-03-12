@@ -2,7 +2,6 @@
 k3d cluster delete my-cluster 2>/dev/null
 k3d registry delete k3d-registry 2>/dev/null
 
-# יצירת רג'יסטרי
 k3d registry create registry.k3d --port 5000
 
 k3d cluster create my-cluster --agents 1 --registry-use registry.k3d:5000 -p "8080:80@loadbalancer"

@@ -1,3 +1,4 @@
+
 apiVersion: v1
 kind: Pod
 metadata:
@@ -5,8 +6,11 @@ metadata:
 spec:
   containers:
   - name: e2e-tests
-    image: bitnami/postgresql-client:latest
-    command: [ "sh", "-c", "sleep 3600" ] # Keeps the pod running
+    image: alpine:latest
+    command: 
+      - "sh"
+      - "-c"
+      - "apk add --no-cache curl postgresql-client bash netcat-openbsd iputils && sleep 3600"
     envFrom:
     - secretRef:
         name: e2e-env-secret
