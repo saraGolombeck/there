@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
     
@@ -30,9 +29,6 @@ pipeline {
         E2E_TEST_DIR = "${WORKSPACE}/E2E_test"
         TEST_POD_YAML = "${E2E_TEST_DIR}/pod.yaml"
         TEST_SCRIPT = "${E2E_TEST_DIR}/test.sh"
-        
-        // Paths for test reports
-        TEST_REPORTS_DIR = "${WORKSPACE}/test-reports"
     }
     
     options {
@@ -265,42 +261,42 @@ EOF
                     echo "Collecting test results..."
                     
                     // Create directory for test reports
-                    sh "mkdir -p ${TEST_REPORTS_DIR}"
+                    sh "mkdir -p test-reports"
                     
                     // Extract test results from pod
-                    sh """
+                    sh '''
                         kubectl exec e2e-tests -- ls -la /tmp/ || true
                         for result in db_test_result.txt api_test_result.txt frontend_test_result.txt integration_test_result.txt; do
-                            kubectl cp e2e-tests:/tmp/\$result ${TEST_REPORTS_DIR}/\$result 2>/dev/null || echo "Could not copy \$result"
+                            kubectl cp e2e-tests:/tmp/$result test-reports/$result 2>/dev/null || echo "Could not copy $result"
                         done
-                    """
+                    '''
                     
                     // Create a simple HTML report
-                    sh """
-                        echo "<html><head><title>E2E Test Results</title>" > ${TEST_REPORTS_DIR}/report.html
-                        echo "<style>body{font-family:Arial;margin:20px}h1{color:#333}pre{background:#f5f5f5;padding:10px;border-radius:5px}</style>" >> ${TEST_REPORTS_DIR}/report.html
-                        echo "</head><body><h1>E2E Test Results</h1>" >> ${TEST_REPORTS_DIR}/report.html
+                    sh '''
+                        echo "<html><head><title>E2E Test Results</title>" > test-reports/report.html
+                        echo "<style>body{font-family:Arial;margin:20px}h1{color:#333}pre{background:#f5f5f5;padding:10px;border-radius:5px}</style>" >> test-reports/report.html
+                        echo "</head><body><h1>E2E Test Results</h1>" >> test-reports/report.html
                         
-                        echo "<h2>Summary</h2>" >> ${TEST_REPORTS_DIR}/report.html
-                        echo "<pre>" >> ${TEST_REPORTS_DIR}/report.html
-                        grep -H "" ${TEST_REPORTS_DIR}/*.txt 2>/dev/null || echo "No test results found" >> ${TEST_REPORTS_DIR}/report.html
-                        echo "</pre>" >> ${TEST_REPORTS_DIR}/report.html
+                        echo "<h2>Summary</h2>" >> test-reports/report.html
+                        echo "<pre>" >> test-reports/report.html
+                        grep -H "" test-reports/*.txt 2>/dev/null || echo "No test results found" >> test-reports/report.html
+                        echo "</pre>" >> test-reports/report.html
                         
-                        echo "<h2>Detailed Results</h2>" >> ${TEST_REPORTS_DIR}/report.html
-                        for file in ${TEST_REPORTS_DIR}/*.txt; do
-                            if [ -f "\$file" ]; then
-                                echo "<h3>\$(basename \$file)</h3>" >> ${TEST_REPORTS_DIR}/report.html
-                                echo "<pre>" >> ${TEST_REPORTS_DIR}/report.html
-                                cat "\$file" >> ${TEST_REPORTS_DIR}/report.html
-                                echo "</pre>" >> ${TEST_REPORTS_DIR}/report.html
+                        echo "<h2>Detailed Results</h2>" >> test-reports/report.html
+                        for file in test-reports/*.txt; do
+                            if [ -f "$file" ]; then
+                                echo "<h3>$(basename $file)</h3>" >> test-reports/report.html
+                                echo "<pre>" >> test-reports/report.html
+                                cat "$file" >> test-reports/report.html
+                                echo "</pre>" >> test-reports/report.html
                             fi
                         done
                         
-                        echo "</body></html>" >> ${TEST_REPORTS_DIR}/report.html
-                    """
+                        echo "</body></html>" >> test-reports/report.html
+                    '''
                     
                     // Archive the test report
-                    archiveArtifacts artifacts: "${TEST_REPORTS_DIR}/**", allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'test-reports/**', allowEmptyArchive: true
                 }
             }
         }
@@ -346,7 +342,7 @@ EOF
                 <p>Test reports are available in the build artifacts.</p>
                 """,
                 to: "${params.EMAIL_RECIPIENTS}",
-                attachmentsPattern: "${TEST_REPORTS_DIR}/report.html",
+                attachmentsPattern: "test-reports/report.html",
                 mimeType: 'text/html'
             )
         }
@@ -372,7 +368,7 @@ EOF
                 <p>Any available test reports are attached or can be viewed in the build artifacts.</p>
                 """,
                 to: "${params.EMAIL_RECIPIENTS}",
-                attachmentsPattern: "${TEST_REPORTS_DIR}/report.html",
+                attachmentsPattern: "test-reports/report.html",
                 mimeType: 'text/html'
             )
         }
